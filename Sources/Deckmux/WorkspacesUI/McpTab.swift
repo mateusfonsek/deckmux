@@ -338,16 +338,7 @@ private struct GoogleForm: View {
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
             DisclosureGroup("Como criar o client_secret.json") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("1. No Google Cloud Console da empresa, crie (ou escolha) um projeto.")
-                    Text("2. Em APIs e serviços → Biblioteca, ative a Google Calendar API e a Google Drive API.")
-                    Text("3. Em Tela de consentimento OAuth, escolha o tipo **Interno**. Em \"Externo/teste\" o login expira a cada 7 dias.")
-                    Text("4. Em Credenciais → Criar credenciais → ID do cliente OAuth, escolha **App para computador** (Desktop).")
-                    Text("5. Baixe o JSON do cliente e arraste-o aqui.")
-                }
-                .font(.callout)
-                .padding(.top, 6)
-                .fixedSize(horizontal: false, vertical: true)
+                GoogleCloudSteps().padding(.top, 6)
             }
         }
     }

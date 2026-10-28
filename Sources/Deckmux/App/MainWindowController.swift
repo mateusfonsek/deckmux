@@ -82,7 +82,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
         separator.frame = NSRect(x: Self.sidebarWidth - 1, y: 0, width: 1, height: size.height)
         separator.autoresizingMask = [.height]
         root.addSubview(separator)
-        let topBar = PageHostingView(rootView: TopBarView(model: nextMeeting) { [weak self] in self?.deck.showWorkspacesTab() })
+        let topBar = PageHostingView(rootView: TopBarView(model: nextMeeting) { [weak self] in
+            self?.deck.show(.today)
+            self?.nextMeeting.guidePresented = true
+        })
         topBar.frame = NSRect(x: Self.sidebarWidth, y: size.height - barHeight, width: rest, height: barHeight)
         topBar.autoresizingMask = [.width, .minYMargin]
         root.addSubview(topBar)

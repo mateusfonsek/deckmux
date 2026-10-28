@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxCalendar
 import SwiftUI
 
 /// Hoje: today's meetings of every workspace on a timeline on the
@@ -11,9 +12,12 @@ struct TodayView: View {
 
     static let agendaWidth: CGFloat = 360
 
+    /// The guide opens by itself on the first visit to Hoje only.
+    @AppStorage("today.agendaGuideSeen") private var guideSeen = false
+
     var body: some View {
         HStack(spacing: 0) {
-            AgendaColumn(model: meetings) { deck.showWorkspacesTab() }
+            AgendaColumn(model: meetings)
                 .frame(width: Self.agendaWidth)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
@@ -27,6 +31,18 @@ struct TodayView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         // SwiftUI's default tint is system blue; buttons follow the app's graphite.
         .tint(Color.deckAccent)
+        .sheet(isPresented: $meetings.guidePresented, onDismiss: { guideSeen = true }) {
+            AgendaGuide(meetings: meetings) { deck.showWorkspacesTab() }
+                .tint(Color.deckAccent)
+        }
+        // The page view is made once; Hoje showing is the page changing to it.
+        .onAppear(perform: openGuideFirstTime)
+        .onChange(of: deck.page) { openGuideFirstTime() }
+    }
+
+    private func openGuideFirstTime() {
+        guard deck.page == .today, !guideSeen, !meetings.guidePresented else { return }
+        meetings.guidePresented = true
     }
 }
 
@@ -34,14 +50,22 @@ struct TodayView: View {
 
 private struct AgendaColumn: View {
     @ObservedObject var model: NextMeetingModel
-    let openWorkspaces: () -> Void
 
     var body: some View {
         let events = model.today
         let day = DayLayout(events: events, now: model.now)
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Hoje").font(Theme.Font.largeTitle)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Hoje").font(Theme.Font.largeTitle)
+                    Spacer()
+                    Button { model.guidePresented = true } label: {
+                        Image(systemName: "questionmark.circle").font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tertiary)
+                    .help("Como conectar a agenda e o Google")
+                }
                 Text(TodayFormat.longDate(model.now).capitalizingFirstLetter).font(Theme.Font.secondary).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)
@@ -58,12 +82,18 @@ private struct AgendaColumn: View {
             }
             Divider()
 
-            if !model.hasAccounts {
+            if !model.hasSources {
                 VStack(spacing: 10) {
                     Image(systemName: "calendar").font(.system(size: 28, weight: .light)).foregroundStyle(.tertiary)
-                    Text("Conecte uma conta Google na aba Workspaces para ver a agenda.")
-                        .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Button("Abrir Workspaces", action: openWorkspaces)
+                    if model.calendarAccess == .denied {
+                        Text("O acesso aos calendários está desligado.")
+                            .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        Button("Abrir Ajustes") { model.openCalendarSettings() }
+                    } else {
+                        Text("Mostre as reuniões do Calendário do Mac aqui.")
+                            .font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        Button("Permitir acesso aos calendários") { model.requestCalendarAccess() }
+                    }
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -84,7 +114,7 @@ private struct AgendaColumn: View {
 private struct Timeline: View {
     let day: DayLayout
     let now: Date
-    let workspace: (GoogleCalendarClient.Event) -> Workspace?
+    let workspace: (Meeting) -> Workspace?
 
     static let hourHeight: CGFloat = 60
     static let gutter: CGFloat = 48
@@ -158,7 +188,7 @@ private struct EventCard: View {
 
     @State private var hovered = false
 
-    private var event: GoogleCalendarClient.Event { placed.event }
+    private var event: Meeting { placed.event }
     private var color: Color { workspace?.color ?? .secondary }
     private var isPast: Bool { event.end <= now }
     private var isShort: Bool { placed.end.timeIntervalSince(placed.start) < 40 * 60 }
@@ -208,14 +238,14 @@ private struct EventCard: View {
     }
 
     @ViewBuilder private var badges: some View {
-        if event.meetURL != nil { Image(systemName: "video.fill").font(.system(size: 9)).foregroundStyle(.secondary) }
+        if event.joinURL != nil { Image(systemName: "video.fill").font(.system(size: 9)).foregroundStyle(.secondary) }
         if !placed.conflicts.isEmpty { Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9)).foregroundStyle(.orange) }
     }
 
     private var tooltip: String {
-        var lines = [event.title, "\(TopBarFormat.time(event.start))–\(TopBarFormat.time(event.end)) · \(workspace?.name ?? "") (\(event.accountEmail))"]
+        var lines = [event.title, "\(TopBarFormat.time(event.start))–\(TopBarFormat.time(event.end)) · \(event.origin(in: workspace))"]
         if !placed.conflicts.isEmpty { lines.append("Conflito com: " + placed.conflicts.joined(separator: ", ")) }
-        lines.append(event.meetURL != nil ? "Clique para entrar na reunião" : "Clique para abrir no Google Calendar")
+        lines.append(event.joinURL != nil ? "Clique para entrar na reunião" : "Clique para abrir na agenda")
         return lines.joined(separator: "\n")
     }
 }
@@ -325,7 +355,7 @@ private struct Chip<Label: View>: View {
 /// share the width side by side, as in Calendar.
 struct DayLayout {
     struct Placed {
-        let event: GoogleCalendarClient.Event
+        let event: Meeting
         /// Clamped to the day.
         let start: Date
         let end: Date
@@ -344,7 +374,7 @@ struct DayLayout {
     let workdayEnd: Date
     let freeSlots: [(start: Date, end: Date)]
 
-    init(events: [GoogleCalendarClient.Event], now: Date, calendar: Calendar = .current) {
+    init(events: [Meeting], now: Date, calendar: Calendar = .current) {
         let midnight = calendar.startOfDay(for: now)
         let nextMidnight = midnight.addingTimeInterval(86_400)
         var items = events

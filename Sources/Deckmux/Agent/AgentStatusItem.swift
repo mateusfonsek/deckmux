@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import DeckmuxCalendar
 import OSLog
 import SwiftUI
 
@@ -223,7 +224,7 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
         }
     }
 
-    private func meetingRow(_ event: GoogleCalendarClient.Event, now: Date) -> NSMenuItem {
+    private func meetingRow(_ event: Meeting, now: Date) -> NSMenuItem {
         let workspace = meetings.workspace(of: event)
         let color = workspace.flatMap { NSColor(hex: $0.manifest.color) } ?? .secondaryLabelColor
         let inProgress = event.start <= now
@@ -241,10 +242,10 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
         }
         if let name = workspace?.name { subtitle += " · \(name)" }
         var content = StatusMenuRowView.Content(leading: .swatch(color), title: event.title, subtitle: subtitle)
-        if event.meetURL != nil, isSoon {
+        if event.joinURL != nil, isSoon {
             content.pill = ("Entrar", color)
         } else {
-            content.trailing = event.meetURL != nil ? "Meet" : "Agenda"
+            content.trailing = event.joinURL != nil ? "Entrar" : "Agenda"
         }
         let entry = NSMenuItem(title: event.title, action: #selector(openMeeting(_:)), keyEquivalent: "")
         entry.target = self

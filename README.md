@@ -9,7 +9,7 @@ A interface é em português.
 - **Terminais de verdade:** libghostty, com abas e splits (Bonsplit). A sessão volta ao reabrir o app: layout, pastas, scrollback e a conversa do Claude Code que rodava em cada terminal.
 - **Workspaces:** cada pasta com um `.workspace.json` vira um grupo na barra lateral, com nome e cor. A cor aparece na barra lateral, nas abas, nas reuniões e nas tarefas.
 - **Claude Code integrado:** por hooks, o Deckmux sabe quando o Claude está trabalhando, terminou ou espera você, e mostra isso no item, na aba, no menu e em notificações.
-- **Hoje:** reuniões do dia (Google Calendar) numa linha do tempo e um quadro de tarefas. O Claude também mexe no quadro, pelo comando `deckmux task`, quando você pede.
+- **Hoje:** reuniões do dia numa linha do tempo, com o botão para entrar no Meet, Zoom ou Teams, e um quadro de tarefas. O Claude também mexe no quadro, pelo comando `deckmux task`, quando você pede.
 - **Configuração do workspace:** `CLAUDE.md`, tema e servidores MCP (Google Calendar + Drive, Slack, ClickUp ou qualquer servidor stdio/http), com revisão do que muda antes de gravar.
 - **Aba de código:** árvore de arquivos, alterações do git e diff lado a lado, sem sair do app.
 - **Gerenciador de tarefas:** CPU e memória por janela, workspace, item e terminal.
@@ -28,6 +28,16 @@ O app não é assinado por um desenvolvedor registrado na Apple, então o macOS 
 Ou, no Terminal: `xattr -dr com.apple.quarantine /Applications/Deckmux.app`.
 
 Na primeira abertura, o Deckmux pede a pasta onde ficam os seus workspaces (cada subpasta com um `.workspace.json` vira um grupo na barra lateral; dá para criar pela aba Workspaces) e abre com um terminal e a tela Hoje. A integração com o Claude Code funciona sem configurar nada e não altera o seu `~/.claude/settings.json`.
+
+## Agenda
+
+As reuniões vêm do Calendário do macOS: qualquer conta que estiver no Mac (iCloud, Google, Outlook…) aparece, basta permitir o acesso aos calendários. Na primeira visita à tela Hoje, um guia mostra como:
+
+1. **Permitir o acesso aos calendários.**
+2. **Google no Mac (opcional):** Ajustes do Sistema → Contas de Internet → Adicionar Conta → Google, com Calendários ligado.
+3. **Google no Claude (opcional):** adicionar o MCP do Google a um workspace (Agenda + Drive para o Claude), com um cliente OAuth do Google Cloud. Um workspace com a conta Google conectada também passa a ler a agenda dessa conta direto pela API do Google.
+
+Depois, o guia volta pelo ícone **?** ao lado de Hoje.
 
 Para usar com o Claude Code, ele precisa estar no `PATH`. Para o MCP do Google, o [uv](https://docs.astral.sh/uv/) (`uvx`).
 

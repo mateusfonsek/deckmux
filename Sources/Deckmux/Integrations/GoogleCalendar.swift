@@ -1,3 +1,4 @@
+import DeckmuxCalendar
 import Foundation
 
 /// Deckmux talks to Google Calendar's API directly, with the token the
@@ -9,19 +10,6 @@ actor GoogleCalendarClient {
         let slug: String
         let email: String
         let tokenFile: URL
-    }
-
-    struct Event: Equatable {
-        let id: String
-        let title: String
-        let start: Date
-        let end: Date
-        /// The Meet link, when the event has one.
-        let meetURL: URL?
-        /// The event in Google Calendar.
-        let calendarURL: URL?
-        let accountEmail: String
-        let workspaceSlug: String
     }
 
     enum CalendarError: LocalizedError {
@@ -65,7 +53,7 @@ actor GoogleCalendarClient {
     /// Events of the primary calendar that end after `now` and start within
     /// `days` of it, already filtered: no all-day events, nothing
     /// declined or cancelled.
-    func upcomingEvents(for account: Account, now: Date = Date(), days: Int = 7) async throws -> [Event] {
+    func upcomingEvents(for account: Account, now: Date = Date(), days: Int = 7) async throws -> [Meeting] {
         let token = try await accessToken(for: account)
         var components = URLComponents(string: "https://www.googleapis.com/calendar/v3/calendars/primary/events")!
         components.queryItems = [
@@ -96,7 +84,7 @@ actor GoogleCalendarClient {
     /// Kinds that are not meetings, even though they have times.
     private static let ignoredTypes: Set<String> = ["workingLocation", "outOfOffice", "focusTime"]
 
-    static func event(from item: JSONValue, account: Account) -> Event? {
+    static func event(from item: JSONValue, account: Account) -> Meeting? {
         guard item["status"]?.stringValue != "cancelled",
               !ignoredTypes.contains(item["eventType"]?.stringValue ?? ""),
               // All-day events have start.date instead of start.dateTime.
@@ -112,12 +100,12 @@ actor GoogleCalendarClient {
             .first { $0["entryPointType"]?.stringValue == "video" }?["uri"]?.stringValue
         let meet = (item["hangoutLink"]?.stringValue ?? video).flatMap { withAccount($0, email: account.email) }
         let calendar = item["htmlLink"]?.stringValue.flatMap { withAccount($0, email: account.email) }
-        return Event(
+        return Meeting(
             id: item["id"]?.stringValue ?? UUID().uuidString,
-            title: item["summary"]?.stringValue ?? "(sem título)",
+            title: item["summary"]?.stringValue ?? "",
             start: start, end: end,
-            meetURL: meet, calendarURL: calendar,
-            accountEmail: account.email, workspaceSlug: account.slug
+            joinURL: meet, openURL: calendar,
+            accountEmail: account.email, workspaceSlug: account.slug, source: .google
         )
     }
 
