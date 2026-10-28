@@ -1,0 +1,105 @@
+name: Release
+
+# Every push to main updates the release PR (version + CHANGELOG from the
+# Conventional Commits since the last tag). Merging that PR tags the version,
+# creates the GitHub Release and builds the .dmg and .zip attached to it.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag existente para recompilar e reanexar os arquivos (ex. v0.2.0)
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  package:
+    name: Empacotar e anexar
+    needs: release-please
+    if: >-
+      always() &&
+      (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Cache do GhosttyKit
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/deckmux/ghosttykit
+          key: ghosttykit-${{ hashFiles('scripts/ghostty.env') }}
+
+      - name: Testes
+        run: |
+          scripts/ensure-ghosttykit.sh
+          swift test
+
+      - name: Build e empacotamento
+        env:
+          DECKMUX_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          scripts/package-release.sh
+          version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/app.noindex/Deckmux.app/Contents/Info.plist)"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Info.plist diz $version, mas a tag é $TAG"
+            exit 1
+          fi
+
+      - name: Conferir o pacote
+        run: |
+          cd dist
+          shasum -a 256 -c SHA256SUMS
+          mnt="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" ./*.dmg
+          codesign --verify --deep --strict "$mnt/Deckmux.app"
+          test -L "$mnt/Applications"
+          hdiutil detach "$mnt"
+
+      - name: Anexar à Release
+        run: gh release upload "$TAG" dist/*.dmg dist/*.zip dist/SHA256SUMS --clobber
+
+      - name: Instruções de instalação nas notas
+        run: |
+          gh release view "$TAG" --json body -q .body > notes.md
+          if ! grep -q '<!-- deckmux-install -->' notes.md; then
+            python3 -I - "$TAG" "$(uname -m)" <<'PY' >> notes.md
+          import sys
+          from pathlib import Path
+          tag, arch = sys.argv[1:]
+          text = Path(".github/release-install.md").read_text()
+          sums = Path("dist/SHA256SUMS").read_text().strip()
+          print(text.replace("@VERSION@", tag[1:]).replace("@ARCH@", arch).replace("@SHA256SUMS@", sums))
+          PY
+            gh release edit "$TAG" --notes-file notes.md
+          fi

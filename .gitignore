@@ -7,3 +7,4 @@ xcuserdata/
 .build/
 .swiftpm/
 .superpowers/
+dist/

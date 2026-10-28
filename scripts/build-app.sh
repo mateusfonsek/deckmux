@@ -23,6 +23,10 @@ for bundle in "$(dirname "$BIN")"/*.bundle; do
   [ -e "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
 done
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+# CI passes its run number so every published build is distinct; local builds keep the plist's.
+if [ -n "${DECKMUX_BUILD_NUMBER:-}" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $DECKMUX_BUILD_NUMBER" "$APP/Contents/Info.plist"
+fi
 # App icon (Icon Composer document) and the neutral accent color
 # → Assets.car + AppIcon.icns.
 xcrun actool "$ROOT/Resources/AppIcon/AppIcon.icon" "$ROOT/Resources/Assets.xcassets" \

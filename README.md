@@ -18,7 +18,7 @@ A interface é em português.
 
 ## Baixar
 
-Baixe o `Deckmux-<versão>-arm64.zip` da [última versão](https://github.com/mateusfonsek/deckmux/releases/latest), abra o zip e arraste o `Deckmux.app` para Aplicativos. Precisa de Mac com Apple Silicon e macOS 14 ou mais novo.
+Baixe o `Deckmux-<versão>-arm64.dmg` da [última versão](https://github.com/mateusfonsek/deckmux/releases/latest), abra e arraste o Deckmux para Aplicativos (há também um `.zip` com o mesmo app). Precisa de Mac com Apple Silicon e macOS 14 ou mais novo.
 
 O app não é assinado por um desenvolvedor registrado na Apple, então o macOS bloqueia a primeira abertura ("não foi possível verificar…"). Para liberar, uma vez só:
 
@@ -45,7 +45,18 @@ Para instalar, feche o Deckmux e copie `build/app.noindex/Deckmux.app` para `/Ap
 
 Testes: `swift test`.
 
+Para gerar o `.dmg` e o `.zip` como na release: `scripts/package-release.sh` (saem em `dist/`, com `SHA256SUMS`).
+
 O app é assinado ad-hoc, tanto o da release quanto o compilado. O macOS liga as permissões (Acessibilidade, Gravação de Tela) ao binário, então pode ser preciso concedê-las de novo depois de instalar uma versão nova.
+
+## Contribuir e versões
+
+Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/pt-br/): `feat:` para novidade, `fix:` para correção, e `docs:`, `refactor:`, `test:`, `ci:` ou `chore:` para o resto. Um `!` depois do tipo (`feat!:`) marca uma mudança que quebra compatibilidade. Os PRs entram por squash, então o título do PR é que precisa seguir o padrão (o CI confere).
+
+As versões seguem [SemVer](https://semver.org/lang/pt-BR/) e saem pelo [release-please](https://github.com/googleapis/release-please):
+
+1. A cada push na `main`, o CI compila e roda os testes, e o release-please atualiza um PR de release com a próxima versão (`feat` sobe o minor, `fix` sobe o patch) e o `CHANGELOG.md`.
+2. Ao mergear esse PR, a tag `vX.Y.Z` e a Release são criadas, e o CI anexa o `.dmg`, o `.zip` e o `SHA256SUMS`.
 
 ## Licença
 
