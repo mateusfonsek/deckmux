@@ -1,0 +1,9 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+/Frameworks/GhosttyKit.xcframework/
+.build/
+.swiftpm/
+.superpowers/

@@ -1,0 +1,75 @@
+#!/bin/bash
+# Deckmux claude wrapper.
+#
+# Inside a Deckmux terminal (DECKMUX_SURFACE_ID set), adds Claude Code hooks
+# for this launch only, through --settings, so Deckmux learns when Claude
+# finishes or needs the user and which conversation the terminal runs. It
+# never writes to ~/.claude/settings.json. It also tells Claude, in one line,
+# that `deckmux task` exists. Everywhere else, and for commands
+# that are not an interactive session, it runs the real claude unchanged.
+
+self="${BASH_SOURCE[0]}"
+self_dir="$(cd "$(dirname "$self")" && pwd -P)"
+
+find_real_claude() {
+    local IFS=: dir resolved
+    for dir in $PATH; do
+        [[ -n "$dir" ]] || continue
+        resolved="$(cd "$dir" 2>/dev/null && pwd -P)" || continue
+        [[ "$resolved" == "$self_dir" ]] && continue
+        [[ -x "$dir/claude" && ! -d "$dir/claude" ]] || continue
+        # Another link to this wrapper would loop forever.
+        [[ "$dir/claude" -ef "$self" ]] && continue
+        printf '%s' "$dir/claude"
+        return 0
+    done
+    return 1
+}
+
+real="$(find_real_claude)" || {
+    echo "deckmux: claude não encontrado no PATH" >&2
+    exit 127
+}
+
+passthrough() { exec "$real" "$@"; }
+
+[[ -n "${DECKMUX_SURFACE_ID:-}" && -x "${DECKMUX_CLI:-}" ]] || passthrough "$@"
+[[ "${DECKMUX_CLAUDE_HOOKS_DISABLED:-}" != 1 ]] || passthrough "$@"
+
+# Subcommands and one-shot runs are not sessions to watch.
+case "${1:-}" in
+    agents|attach|auth|auto-mode|doctor|gateway|import|install|logs|mcp|plugin|plugins|purge|\
+    respawn|rm|setup-token|stop|kill|ultrareview|update|upgrade|migrate-installer|config|\
+    -v|--version|-h|--help)
+        passthrough "$@" ;;
+esac
+
+inject_session_id=1
+inject_prompt=1
+for arg in "$@"; do
+    case "$arg" in
+        -p|--print) passthrough "$@" ;;
+        # The user's own settings document wins; do not merge into it.
+        --settings|--settings=*) passthrough "$@" ;;
+        -r|--resume|--resume=*|-c|--continue|--session-id|--session-id=*) inject_session_id=0 ;;
+        # One appended prompt per launch: the user's own wins.
+        --append-system-prompt|--append-system-prompt=*|--append-system-prompt-file|--append-system-prompt-file=*) inject_prompt=0 ;;
+    esac
+done
+
+hook() {
+    printf '"%s":[{"hooks":[{"type":"command","command":"\\"$DECKMUX_CLI\\" hook %s","timeout":5}]}]' "$1" "$2"
+}
+settings="{\"hooks\":{$(hook SessionStart session-start),$(hook SessionEnd session-end),$(hook Stop stop),$(hook Notification notification),$(hook PermissionRequest permission-request)}}"
+
+# The Hoje task board, kept to one line. Claude only touches it on request.
+extra=()
+if [[ "$inject_prompt" == 1 ]]; then
+    extra=(--append-system-prompt "Deckmux: o comando \`deckmux task\` (ajuda: \`deckmux task --help\`) gerencia o quadro de tarefas do usuário. Use-o só quando o usuário pedir explicitamente para criar ou alterar tarefas; nunca por conta própria.")
+fi
+
+if [[ "$inject_session_id" == 1 ]]; then
+    session_id="$(/usr/bin/uuidgen | /usr/bin/tr '[:upper:]' '[:lower:]')"
+    exec "$real" --session-id "$session_id" --settings "$settings" "${extra[@]}" "$@"
+fi
+exec "$real" --settings "$settings" "${extra[@]}" "$@"

@@ -1,0 +1,124 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "srgb:0.20392,0.22745,0.27451,1.00000",
+      "srgb:0.06667,0.07843,0.10588,1.00000"
+    ]
+  },
+  "groups": [
+    {
+      "blend-mode": "normal",
+      "lighting": "individual",
+      "specular": false,
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.7
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      },
+      "layers": [
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "eyes.svg",
+          "name": "eyes",
+          "opacity": 1
+        }
+      ]
+    },
+    {
+      "blend-mode": "normal",
+      "lighting": "individual",
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      },
+      "layers": [
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "sheen.svg",
+          "name": "sheen",
+          "opacity": 1
+        },
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "recess.svg",
+          "name": "recess",
+          "opacity": 1
+        },
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "halo.svg",
+          "name": "halo",
+          "opacity": 1
+        },
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "prompt.svg",
+          "name": "prompt",
+          "opacity": 1
+        }
+      ]
+    },
+    {
+      "blend-mode": "normal",
+      "lighting": "individual",
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      },
+      "layers": [
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "screen.svg",
+          "name": "screen",
+          "opacity": 1
+        }
+      ]
+    },
+    {
+      "blend-mode": "normal",
+      "lighting": "individual",
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.6
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.12
+      },
+      "layers": [
+        {
+          "glass": true,
+          "hidden": false,
+          "image-name": "bezel.svg",
+          "name": "bezel",
+          "opacity": 1
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}
