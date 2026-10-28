@@ -30,6 +30,10 @@
 	<string>0.1.0</string> <!-- x-release-please-version -->
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>O Deckmux mostra as reuniões do dia na tela Hoje e na barra do topo.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>O Deckmux mostra as reuniões do dia na tela Hoje e na barra do topo.</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>

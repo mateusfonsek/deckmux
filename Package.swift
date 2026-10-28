@@ -30,6 +30,9 @@ let package = Package(
         // A sidebar item's own name and tag (color, icon, text); Foundation only.
         .target(name: "DeckmuxChat", path: "Sources/DeckmuxChat", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "DeckmuxChatTests", dependencies: ["DeckmuxChat"], path: "Tests/DeckmuxChatTests"),
+        // Meetings from Google and from the Mac's calendars: one type, link extraction, merge; Foundation only.
+        .target(name: "DeckmuxCalendar", path: "Sources/DeckmuxCalendar", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "DeckmuxCalendarTests", dependencies: ["DeckmuxCalendar"], path: "Tests/DeckmuxCalendarTests"),
         // `deckmux hook <event>` and `deckmux task …`, bundled as Contents/Resources/bin/deckmux.
         .executableTarget(name: "DeckmuxCLI", dependencies: ["DeckmuxTasks"], path: "Sources/DeckmuxCLI",
                           swiftSettings: [.swiftLanguageMode(.v5)]),
@@ -43,6 +46,7 @@ let package = Package(
                 "DeckmuxTop",
                 "DeckmuxMonitor",
                 "DeckmuxChat",
+                "DeckmuxCalendar",
                 .product(name: "Bonsplit", package: "Bonsplit"),
                 .product(name: "Highlightr", package: "Highlightr"),
             ],

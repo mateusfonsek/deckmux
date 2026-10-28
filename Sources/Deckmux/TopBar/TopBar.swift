@@ -1,32 +1,46 @@
 import AppKit
 import Combine
+import DeckmuxCalendar
 import SwiftUI
 
-/// Meetings across every workspace with a Google login: the next one for the
-/// top bar and today's for Hoje. Events are fetched
-/// from the start of today every few minutes; which one is "next" is worked out
-/// again every minute from what was fetched, so a meeting that ends gives
-/// way to the following one without waiting for the network.
+/// Meetings from the Mac's calendars and from every workspace with a Google
+/// login: the next one for the top bar and today's for Hoje. Events are
+/// fetched from the start of today every few minutes (and at once when
+/// Calendar changes); which one is "next" is worked out again every minute
+/// from what was fetched, so a meeting that ends gives way to the following
+/// one without waiting for the network.
 @MainActor
 final class NextMeetingModel: ObservableObject {
     @Published private(set) var now = Date()
-    @Published private(set) var events: [GoogleCalendarClient.Event] = []
-    @Published private(set) var hasAccounts = false
+    @Published private(set) var events: [Meeting] = []
+    /// Whether Deckmux may read the Mac's calendars.
+    @Published private(set) var calendarAccess: MacCalendarSource.Access
+    /// Some workspace has a Google login (the API, with the Meet link).
+    @Published private(set) var hasGoogleToken = false
+    /// A Google account is among the Mac's calendars.
+    @Published private(set) var hasGoogleOnMac = false
     /// Accounts whose last fetch failed, with the reason.
     @Published private(set) var failures: [String: String] = [:]
+    /// Hoje's agenda guide is on screen (first visit, help button, top bar).
+    @Published var guidePresented = false
 
     private let store: WorkspaceStore
     private let client = GoogleCalendarClient()
+    private let mac = MacCalendarSource()
     private var clock: Timer?
     private var fetchTimer: Timer?
     private var observers: [AnyCancellable] = []
     private var wakeObserver: NSObjectProtocol?
     private var fetching = false
+    /// A refresh asked for while one was running: runs when it ends.
+    private var pending = false
 
     static let fetchInterval: TimeInterval = 5 * 60
 
     init(store: WorkspaceStore) {
         self.store = store
+        calendarAccess = mac.access
+        mac.onChange = { [weak self] in self?.refresh() }
         // Workspaces appearing or a new Google login change the accounts.
         observers.append(store.$workspaces.removeDuplicates().sink { [weak self] _ in
             DispatchQueue.main.async { self?.refresh() }
@@ -43,13 +57,16 @@ final class NextMeetingModel: ObservableObject {
         fetchTimer?.tolerance = 30
     }
 
+    /// There is somewhere to read meetings from.
+    var hasSources: Bool { calendarAccess == .granted || hasGoogleToken }
+
     /// The meeting to show: the one in progress, or else the next to start.
-    var next: GoogleCalendarClient.Event? {
+    var next: Meeting? {
         events.filter { $0.end > now }.min { $0.start < $1.start }
     }
 
     /// Every meeting overlapping the day of `now`, by start time.
-    var today: [GoogleCalendarClient.Event] {
+    var today: [Meeting] {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: now)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
@@ -59,27 +76,46 @@ final class NextMeetingModel: ObservableObject {
     /// Meetings of today that have not ended yet.
     var remainingToday: Int { today.filter { $0.end > now }.count }
 
-    func workspace(of event: GoogleCalendarClient.Event) -> Workspace? {
-        store.workspace(slug: event.workspaceSlug)
+    func workspace(of event: Meeting) -> Workspace? {
+        event.workspaceSlug.flatMap { store.workspace(slug: $0) }
     }
 
-    func refresh() {
-        let accounts = GoogleCalendarClient.accounts(in: store.workspaces)
-        hasAccounts = !accounts.isEmpty
-        guard !accounts.isEmpty else {
-            events = []
-            failures = [:]
-            return
+    func requestCalendarAccess() {
+        Task {
+            calendarAccess = await mac.requestAccess()
+            refresh()
         }
-        guard !fetching else { return }
+    }
+
+    func openCalendarSettings() { mac.openSettings() }
+
+    func refresh() {
+        calendarAccess = mac.access
+        hasGoogleOnMac = mac.hasGoogleAccount
+        let accounts = GoogleCalendarClient.accounts(in: store.workspaces)
+        hasGoogleToken = !accounts.isEmpty
+        guard !fetching else { pending = true; return }
         fetching = true
+        // A Mac calendar of the same account as a workspace's Google login takes that workspace's color.
+        var slugs: [String: String] = [:]
+        for workspace in store.workspaces {
+            if let email = workspace.manifest.google?.email?.lowercased() { slugs[email] = workspace.id }
+        }
+        for account in accounts { slugs[account.email.lowercased()] = account.slug }
+        // From midnight, so Hoje also shows the meetings already over.
+        let fromMac = mac.meetings(from: Calendar.current.startOfDay(for: Date()), days: 8) { $0.flatMap { slugs[$0] } }
         Task {
             let (collected, failed) = await Self.fetch(accounts, client: client)
             // A failed account keeps its last known events instead of vanishing.
-            let kept = events.filter { failed[$0.accountEmail] != nil }
-            events = collected + kept
+            let failedAccounts = Set(failed.keys.map { $0.lowercased() })
+            let kept = events.filter { $0.source == .google && $0.accountEmail.map(failedAccounts.contains) == true }
+            events = MeetingMerge.merge(google: collected + kept, mac: fromMac, googleAccounts: Set(accounts.map(\.email)))
             failures = failed
             fetching = false
+            if pending {
+                pending = false
+                refresh()
+            }
         }
     }
 
@@ -88,13 +124,13 @@ final class NextMeetingModel: ObservableObject {
     /// seconds after launch (swift::TaskGroup::offer, EXC_BAD_ACCESS).
     nonisolated private static func fetch(
         _ accounts: [GoogleCalendarClient.Account], client: GoogleCalendarClient
-    ) async -> ([GoogleCalendarClient.Event], [String: String]) {
+    ) async -> ([Meeting], [String: String]) {
         // From midnight, so Hoje also shows the meetings already over.
         let from = Calendar.current.startOfDay(for: Date())
         let tasks = accounts.map { account in
             (account.email, Task { try await client.upcomingEvents(for: account, now: from, days: 8) })
         }
-        var collected: [GoogleCalendarClient.Event] = []
+        var collected: [Meeting] = []
         var failed: [String: String] = [:]
         for (email, task) in tasks {
             do { collected += try await task.value }
@@ -123,7 +159,7 @@ final class NextMeetingModel: ObservableObject {
 /// window, as a titlebar does.
 struct TopBarView: View {
     @ObservedObject var model: NextMeetingModel
-    let openWorkspaces: () -> Void
+    let showAgenda: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -144,14 +180,14 @@ struct TopBarView: View {
     }
 
     @ViewBuilder private var meeting: some View {
-        if !model.hasAccounts {
-            Button(action: openWorkspaces) {
-                Label("Conectar Google Agenda", systemImage: "calendar.badge.plus")
+        if !model.hasSources {
+            Button(action: showAgenda) {
+                Label("Mostrar agenda", systemImage: "calendar.badge.plus")
             }
             .buttonStyle(.plain)
             .font(Theme.Font.secondary)
             .foregroundStyle(.secondary)
-            .help("Conecte uma conta Google na aba Workspaces para ver a próxima reunião")
+            .help("Mostre as reuniões do Calendário do Mac na barra do topo")
         } else if let event = model.next {
             MeetingButton(event: event, workspace: model.workspace(of: event), now: model.now, failures: model.failures)
         } else if !model.failures.isEmpty {
@@ -170,7 +206,7 @@ struct TopBarView: View {
 /// The next meeting as a chip. It turns into a call to action ("Entrar")
 /// from 10 minutes before until it ends.
 private struct MeetingButton: View {
-    let event: GoogleCalendarClient.Event
+    let event: Meeting
     let workspace: Workspace?
     let now: Date
     let failures: [String: String]
@@ -201,7 +237,7 @@ private struct MeetingButton: View {
                     if let relative = TopBarFormat.relative(event, now: now) {
                         Text(relative).foregroundStyle(isSoon ? color : .secondary).fontWeight(isSoon ? .semibold : .regular)
                     }
-                    if event.meetURL != nil {
+                    if event.joinURL != nil {
                         if isSoon {
                             Label("Entrar", systemImage: "video.fill")
                                 .font(.system(size: 11, weight: .semibold))
@@ -215,7 +251,7 @@ private struct MeetingButton: View {
                 }
                 .font(.system(size: 12))
                 .padding(.leading, 10)
-                .padding(.trailing, event.meetURL != nil && isSoon ? 4 : 10)
+                .padding(.trailing, event.joinURL != nil && isSoon ? 4 : 10)
                 .frame(height: 26)
                 .background(Capsule().fill(color.opacity(isSoon ? 0.16 : hovered ? 0.10 : 0.06)))
                 .contentShape(Capsule())
@@ -228,8 +264,8 @@ private struct MeetingButton: View {
 
     private var tooltip: String {
         let range = "\(TopBarFormat.time(event.start))–\(TopBarFormat.time(event.end))"
-        let target = event.meetURL != nil ? "Clique para entrar na reunião" : "Clique para abrir no Google Calendar"
-        return "\(event.title)\n\(range) · \(workspace?.name ?? "") (\(event.accountEmail))\n\(target)"
+        let target = event.joinURL != nil ? "Clique para entrar na reunião" : "Clique para abrir na agenda"
+        return "\(event.title)\n\(range) · \(event.origin(in: workspace))\n\(target)"
     }
 }
 
@@ -263,7 +299,7 @@ enum TopBarFormat {
     static func time(_ date: Date) -> String { format("HH:mm", date) }
 
     /// "em 25 min", "em 1 h 10" within two hours; nil further away or during it.
-    static func relative(_ event: GoogleCalendarClient.Event, now: Date) -> String? {
+    static func relative(_ event: Meeting, now: Date) -> String? {
         let minutes = Int((event.start.timeIntervalSince(now) / 60).rounded(.up))
         guard minutes > 0, minutes <= 120 else { return nil }
         if minutes < 60 { return "em \(minutes) min" }
@@ -273,7 +309,7 @@ enum TopBarFormat {
 
     /// "09:30", "09:30 (amanhã)", "09:30 (sex, 17 out)" or, during the
     /// meeting, "até 10:00".
-    static func when(_ event: GoogleCalendarClient.Event, now: Date) -> String {
+    static func when(_ event: Meeting, now: Date) -> String {
         if event.start <= now { return "até \(time(event.end))" }
         let calendar = Calendar.current
         if calendar.isDate(event.start, inSameDayAs: now) { return time(event.start) }
@@ -284,9 +320,24 @@ enum TopBarFormat {
     }
 }
 
-extension GoogleCalendarClient.Event {
-    /// The Meet link, or the event in Google Calendar when there is none.
+extension Meeting {
+    /// Where the meeting comes from, for tooltips: "Workspace (conta)".
+    func origin(in workspace: Workspace?) -> String {
+        let account = accountEmail ?? (source == .mac ? "Calendário do Mac" : nil)
+        return switch (workspace?.name, account) {
+        case let (name?, account?): "\(name) (\(account))"
+        case let (name?, nil): name
+        case let (nil, account?): account
+        case (nil, nil): ""
+        }
+    }
+
+    /// The call link, or else the event in Google Calendar or Calendar.
     func open() {
-        if let url = meetURL ?? calendarURL { NSWorkspace.shared.open(url) }
+        if let url = joinURL ?? openURL, NSWorkspace.shared.open(url) { return }
+        // A Mac event Calendar cannot show by its link: at least open Calendar.
+        if source == .mac, let calendar = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
+            NSWorkspace.shared.openApplication(at: calendar, configuration: NSWorkspace.OpenConfiguration())
+        }
     }
 }

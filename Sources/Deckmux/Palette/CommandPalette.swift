@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxCalendar
 import DeckmuxTasks
 import SwiftUI
 
@@ -34,7 +35,7 @@ enum PaletteEntries {
             let inProgress = next.start <= meetings.now
             entries.append(PaletteEntry(
                 id: "meeting", section: .meeting,
-                title: (next.meetURL != nil ? "Entrar: " : "Abrir: ") + next.title,
+                title: (next.joinURL != nil ? "Entrar: " : "Abrir: ") + next.title,
                 subtitle: [inProgress ? "agora" : TopBarFormat.when(next, now: meetings.now), TopBarFormat.relative(next, now: meetings.now), workspace?.name]
                     .compactMap { $0 }.joined(separator: " · "),
                 icon: "video.fill", color: workspace?.color, keywords: "reuniao meet entrar agenda"
