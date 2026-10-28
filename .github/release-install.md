@@ -2,7 +2,7 @@
 <!-- deckmux-install -->
 ## Instalação
 
-Precisa de Mac com Apple Silicon e macOS 14 ou mais novo.
+Funciona em Mac com Apple Silicon ou Intel, com macOS 14 ou mais novo.
 
 Pelo Homebrew: `brew install --cask mateusfonsek/tap/deckmux` (ou `brew upgrade --cask deckmux`, se já tiver).
 

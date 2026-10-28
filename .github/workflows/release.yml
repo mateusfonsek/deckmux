@@ -69,7 +69,7 @@ jobs:
         env:
           DECKMUX_BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          scripts/package-release.sh
+          scripts/package-release.sh --universal
           version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/app.noindex/Deckmux.app/Contents/Info.plist)"
           if [ "v$version" != "$TAG" ]; then
             echo "::error::Info.plist diz $version, mas a tag é $TAG"
@@ -83,6 +83,10 @@ jobs:
           mnt="$(mktemp -d)"
           hdiutil attach -nobrowse -readonly -mountpoint "$mnt" ./*.dmg
           codesign --verify --deep --strict "$mnt/Deckmux.app"
+          for binary in MacOS/Deckmux Resources/bin/deckmux; do
+            archs="$(lipo -archs "$mnt/Deckmux.app/Contents/$binary")"
+            [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$binary: $archs"; exit 1; }
+          done
           test -L "$mnt/Applications"
           hdiutil detach "$mnt"
 
@@ -93,7 +97,8 @@ jobs:
         run: |
           gh release view "$TAG" --json body -q .body > notes.md
           if ! grep -q '<!-- deckmux-install -->' notes.md; then
-            python3 -I - "$TAG" "$(uname -m)" <<'PY' >> notes.md
+            dmg="$(basename dist/*.dmg .dmg)"
+            python3 -I - "$TAG" "${dmg##*-}" <<'PY' >> notes.md
           import sys
           from pathlib import Path
           tag, arch = sys.argv[1:]
@@ -119,6 +124,14 @@ jobs:
         if: env.HAS_TOKEN != 'true'
         run: echo "::warning::O secret HOMEBREW_TAP_TOKEN não está configurado; o cask não foi atualizado."
 
+      # The cask is rendered from the template of the released version.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.HAS_TOKEN == 'true'
+        with:
+          ref: ${{ env.TAG }}
+          sparse-checkout: .github/homebrew
+          path: deckmux
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.HAS_TOKEN == 'true'
         with:
@@ -132,15 +145,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p SHA256SUMS -O SHA256SUMS
-          python3 -I - "${TAG#v}" SHA256SUMS tap/Casks/deckmux.rb <<'PY'
-          import re, sys
+          python3 -I - "${TAG#v}" SHA256SUMS deckmux/.github/homebrew/deckmux.rb tap/Casks/deckmux.rb <<'PY'
+          import sys
           from pathlib import Path
-          version, sums, cask = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
+          version, sums, template, cask = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])
           sha = next(line.split()[0] for line in sums.read_text().splitlines() if line.endswith(".dmg"))
-          text = cask.read_text()
-          text = re.sub(r'^  version ".*"$', f'  version "{version}"', text, count=1, flags=re.M)
-          text = re.sub(r'^  sha256 ".*"$', f'  sha256 "{sha}"', text, count=1, flags=re.M)
-          cask.write_text(text)
+          cask.write_text(template.read_text().replace("@VERSION@", version).replace("@SHA256@", sha))
           PY
           cd tap
           if git diff --quiet; then

@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Builds the release app and packages it for download: a .dmg (drag to
 # Applications) and a .zip, plus SHA256SUMS, in dist/.
-# Usage: scripts/package-release.sh
+# Usage: scripts/package-release.sh [--universal]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-"$ROOT/scripts/build-app.sh" release
+"$ROOT/scripts/build-app.sh" release "$@"
 
 APP="$ROOT/build/app.noindex/Deckmux.app"
 VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")"
-ARCH="$(uname -m)"
+# "universal" when the binary carries both Apple Silicon and Intel.
+ARCHS="$(lipo -archs "$APP/Contents/MacOS/Deckmux")"
+case "$ARCHS" in
+  *arm64*x86_64*|*x86_64*arm64*) ARCH=universal ;;
+  *) ARCH="$ARCHS" ;;
+esac
 NAME="Deckmux-$VERSION-$ARCH"
 DIST="$ROOT/dist"
 rm -rf "$DIST"
