@@ -16,13 +16,24 @@ A interface é em português.
 - **Janelinha:** painel flutuante opcional com as sessões do Claude, os subagents e o uso da conta.
 - **Chats personalizados:** nome próprio e uma etiqueta (cor + ícone) por item, pelo botão direito.
 
-## Requisitos
+## Baixar
 
-- macOS 14 ou mais novo.
-- Xcode com Swift 6 (as Command Line Tools bastam).
-- [Claude Code](https://claude.com/claude-code) no `PATH`. Para o MCP do Google, o [uv](https://docs.astral.sh/uv/) (`uvx`).
+Baixe o `Deckmux-<versão>-arm64.zip` da [última versão](https://github.com/mateusfonsek/deckmux/releases/latest), abra o zip e arraste o `Deckmux.app` para Aplicativos. Precisa de Mac com Apple Silicon e macOS 14 ou mais novo.
 
-## Compilar e instalar
+O app não é assinado por um desenvolvedor registrado na Apple, então o macOS bloqueia a primeira abertura ("não foi possível verificar…"). Para liberar, uma vez só:
+
+1. Abra o Deckmux e feche o aviso.
+2. Vá em Ajustes do Sistema → Privacidade e Segurança, desça até "Deckmux foi bloqueado" e clique em **Abrir Mesmo Assim**.
+
+Ou, no Terminal: `xattr -dr com.apple.quarantine /Applications/Deckmux.app`.
+
+Na primeira abertura, o Deckmux pede a pasta onde ficam os seus workspaces (cada subpasta com um `.workspace.json` vira um grupo na barra lateral; dá para criar pela aba Workspaces) e abre com um terminal e a tela Hoje. A integração com o Claude Code funciona sem configurar nada e não altera o seu `~/.claude/settings.json`.
+
+Para usar com o Claude Code, ele precisa estar no `PATH`. Para o MCP do Google, o [uv](https://docs.astral.sh/uv/) (`uvx`).
+
+## Compilar a partir do código
+
+Precisa do Xcode com Swift 6 (as Command Line Tools bastam).
 
 ```bash
 scripts/build-app.sh release --open   # monta build/app.noindex/Deckmux.app e abre
@@ -34,7 +45,7 @@ Para instalar, feche o Deckmux e copie `build/app.noindex/Deckmux.app` para `/Ap
 
 Testes: `swift test`.
 
-O app é assinado ad-hoc. O macOS liga as permissões (Acessibilidade, Gravação de Tela) ao binário, então pode ser preciso concedê-las de novo depois de instalar uma versão nova.
+O app é assinado ad-hoc, tanto o da release quanto o compilado. O macOS liga as permissões (Acessibilidade, Gravação de Tela) ao binário, então pode ser preciso concedê-las de novo depois de instalar uma versão nova.
 
 ## Licença
 
