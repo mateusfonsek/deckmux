@@ -1,3 +1,4 @@
+import DeckmuxShell
 import Foundation
 
 /// The user's shell PATH. Opened from the Finder, Deckmux inherits launchd's
@@ -16,6 +17,14 @@ enum UserShell {
             return task
         }
         return await task.value
+    }
+
+    /// `name` on the user's PATH. When it is missing, the PATH is read again
+    /// once: it may have been installed after Deckmux opened.
+    static func find(_ name: String) async -> String? {
+        if let found = Executables.find(name, inPath: await path(), skipping: AgentIntegration.binDirectory?.path) { return found }
+        lock.withLock { pathTask = nil }
+        return Executables.find(name, inPath: await path(), skipping: AgentIntegration.binDirectory?.path)
     }
 
     private static func resolvePath() async -> String {
@@ -68,12 +77,7 @@ enum UserShell {
 
     /// The `claude` executable on the user's PATH (never Deckmux's wrapper).
     static func claudeExecutable(path: String) -> String? {
-        let wrapperDir = AgentIntegration.binDirectory?.standardizedFileURL.path
-        for dir in path.split(separator: ":").map(String.init) where URL(fileURLWithPath: dir).standardizedFileURL.path != wrapperDir {
-            let candidate = (dir as NSString).appendingPathComponent("claude")
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        return nil
+        Executables.find("claude", inPath: path, skipping: AgentIntegration.binDirectory?.path)
     }
 }
 
@@ -93,7 +97,7 @@ enum McpStatusChecker {
     static func check(root: URL) async -> Result<[String: McpHealth], ApplyError> {
         let path = await UserShell.path()
         guard let claude = UserShell.claudeExecutable(path: path) else {
-            return .failure(ApplyError(message: "claude não encontrado no PATH."))
+            return .failure(ApplyError(message: ClaudeCodeSetup.missingMessage))
         }
         let output = await UserShell.run(claude, ["mcp", "list"], in: root, path: path)
         guard output.status == 0 || !output.stdout.isEmpty else {

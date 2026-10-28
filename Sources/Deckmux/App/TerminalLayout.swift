@@ -715,7 +715,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         case Self.newClaudeButton.id:
             var config = inheritedConfig(context: GHOSTTY_SURFACE_CONTEXT_TAB) ?? Ghostty.SurfaceConfiguration()
             config.initialInput = "claude\n"
-            addTab(config: config, inPane: pane)
+            ClaudeCodeSetup.whenInstalled { [weak self] in self?.addTab(config: config, inPane: pane) }
         case Self.codeButton.id:
             openCodeForFocusedFolder(inPane: pane)
         default:

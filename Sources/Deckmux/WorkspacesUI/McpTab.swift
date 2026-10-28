@@ -183,7 +183,7 @@ struct McpTab: View {
     /// Slack and ClickUp log in through Claude Code's own /mcp screen.
     private func authenticate(_ name: String) {
         authHint = "Abri o /mcp do Claude num terminal em \(workspace.name): escolha \(name) → Authenticate e faça o login no navegador com a conta da \(workspace.name). Depois volte aqui e clique em Verificar."
-        model.openTerminal?(workspace.root, "claude '/mcp'\n")
+        ClaudeCodeSetup.whenInstalled { [model, workspace] in model.openTerminal?(workspace.root, "claude '/mcp'\n") }
     }
 
     private func connectGoogle(server: String) {
@@ -304,9 +304,24 @@ struct AddMcpSheet: View {
 private struct GoogleForm: View {
     @Binding var spec: McpServerSpec
     @State private var isTargeted = false
+    /// The Google MCP runs with `uvx`; without uv, Claude Code cannot start it.
+    @State private var uvMissing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if uvMissing {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("O MCP do Google precisa do uv (comando uvx), que não está instalado.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    HStack {
+                        Text(ClaudeCodeSetup.uvInstallCommand).font(Theme.Font.mono).textSelection(.enabled)
+                        Button("Copiar") { ClaudeCodeSetup.copy(ClaudeCodeSetup.uvInstallCommand) }
+                    }
+                    Text("Rode no Terminal e depois abra um terminal novo no Deckmux.").foregroundStyle(.secondary)
+                }
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             VStack(spacing: 8) {
                 Image(systemName: "doc.badge.plus").font(.system(size: 26)).foregroundStyle(.secondary)
                 Text(spec.googleClientSecret?.lastPathComponent ?? "Arraste o client_secret.json aqui")
@@ -341,6 +356,7 @@ private struct GoogleForm: View {
                 GoogleCloudSteps().padding(.top, 6)
             }
         }
+        .task { uvMissing = await UserShell.find("uvx") == nil }
     }
 
     private func choose() {
