@@ -103,3 +103,51 @@ jobs:
           PY
             gh release edit "$TAG" --notes-file notes.md
           fi
+
+  homebrew:
+    name: Atualizar o cask do Homebrew
+    needs: [release-please, package]
+    if: always() && needs.package.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+      HAS_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    steps:
+      - name: Sem token
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::warning::O secret HOMEBREW_TAP_TOKEN não está configurado; o cask não foi atualizado."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.HAS_TOKEN == 'true'
+        with:
+          repository: mateusfonsek/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Versão e SHA-256 no cask
+        if: env.HAS_TOKEN == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p SHA256SUMS -O SHA256SUMS
+          python3 -I - "${TAG#v}" SHA256SUMS tap/Casks/deckmux.rb <<'PY'
+          import re, sys
+          from pathlib import Path
+          version, sums, cask = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
+          sha = next(line.split()[0] for line in sums.read_text().splitlines() if line.endswith(".dmg"))
+          text = cask.read_text()
+          text = re.sub(r'^  version ".*"$', f'  version "{version}"', text, count=1, flags=re.M)
+          text = re.sub(r'^  sha256 ".*"$', f'  sha256 "{sha}"', text, count=1, flags=re.M)
+          cask.write_text(text)
+          PY
+          cd tap
+          if git diff --quiet; then
+            echo "O cask já está em ${TAG#v}."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deckmux ${TAG#v}"
+          git push
