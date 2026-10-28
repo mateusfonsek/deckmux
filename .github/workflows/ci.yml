@@ -33,7 +33,8 @@ jobs:
           key: ghosttykit-${{ hashFiles('scripts/ghostty.env') }}
 
       - name: Build do app (release)
-        run: scripts/build-app.sh release
+        # Universal like the releases, so an Intel-only break shows before merge.
+        run: scripts/build-app.sh release --universal
 
       - name: Testes
         run: swift test

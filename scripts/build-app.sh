@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
 # Builds Deckmux with SwiftPM and assembles build/app.noindex/Deckmux.app (ad-hoc signed).
-# Usage: scripts/build-app.sh [debug|release] [--open]
+# Usage: scripts/build-app.sh [debug|release] [--universal] [--open]
+#   --universal  Apple Silicon + Intel in one binary (the releases); slower.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="${1:-debug}"
+shift || true
+OPEN=0
+ARCHS=()
+for arg in "$@"; do
+  case "$arg" in
+    --open) OPEN=1 ;;
+    --universal) ARCHS=(--arch arm64 --arch x86_64) ;;
+    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
 "$ROOT/scripts/ensure-ghosttykit.sh"
 
-swift build --package-path "$ROOT" -c "$CONFIG"
-BIN="$(swift build --package-path "$ROOT" -c "$CONFIG" --show-bin-path)/Deckmux"
+# ${ARCHS[@]+…}: bash 3.2 (macOS) treats an empty array as unset under set -u.
+swift build --package-path "$ROOT" -c "$CONFIG" ${ARCHS[@]+"${ARCHS[@]}"}
+BIN="$(swift build --package-path "$ROOT" -c "$CONFIG" ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)/Deckmux"
 
 # Spotlight (and so Launchpad and the Apps list) skips folders ending in
 # .noindex, so this copy never shows up next to the installed one in
@@ -60,6 +72,6 @@ cp -R "$ROOT/Resources/terminfo" "$APP/Contents/Resources/terminfo"
 codesign --force --sign - "$APP" >/dev/null
 echo "Built $APP"
 
-if [ "${2:-}" = "--open" ]; then
+if [ "$OPEN" = 1 ]; then
   open "$APP"
 fi
