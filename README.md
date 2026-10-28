@@ -16,11 +16,21 @@ A interface é em português.
 - **Janelinha:** painel flutuante opcional com as sessões do Claude, os subagents e o uso da conta.
 - **Chats personalizados:** nome próprio e uma etiqueta (cor + ícone) por item, pelo botão direito.
 
-## Baixar
+## Instalar
 
-Baixe o `Deckmux-<versão>-arm64.dmg` da [última versão](https://github.com/mateusfonsek/deckmux/releases/latest), abra e arraste o Deckmux para Aplicativos (há também um `.zip` com o mesmo app). Precisa de Mac com Apple Silicon e macOS 14 ou mais novo.
+Precisa de Mac com Apple Silicon e macOS 14 ou mais novo.
 
-O app não é assinado por um desenvolvedor registrado na Apple, então o macOS bloqueia a primeira abertura ("não foi possível verificar…"). Para liberar, uma vez só:
+Pelo [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask mateusfonsek/tap/deckmux
+```
+
+Atualizar: `brew upgrade --cask deckmux`. O cask libera o app no macOS durante a instalação (tira a marca de quarentena), então ele abre direto.
+
+Ou baixe o `Deckmux-<versão>-arm64.dmg` da [última versão](https://github.com/mateusfonsek/deckmux/releases/latest), abra e arraste o Deckmux para Aplicativos (há também um `.zip` com o mesmo app).
+
+O app não é assinado por um desenvolvedor registrado na Apple, então, baixado pelo navegador, o macOS bloqueia a primeira abertura ("não foi possível verificar…"). Para liberar, uma vez só:
 
 1. Abra o Deckmux e feche o aviso.
 2. Vá em Ajustes do Sistema → Privacidade e Segurança, desça até "Deckmux foi bloqueado" e clique em **Abrir Mesmo Assim**.
