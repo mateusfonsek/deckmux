@@ -27,7 +27,11 @@ find_real_claude() {
 }
 
 real="$(find_real_claude)" || {
-    echo "deckmux: claude não encontrado no PATH" >&2
+    cat >&2 <<'EOF'
+O Claude Code não está instalado (ou não está no PATH deste terminal).
+Para instalar:  curl -fsSL https://claude.ai/install.sh | bash
+Depois, abra um terminal novo. Mais em https://docs.claude.com/en/docs/claude-code/setup
+EOF
     exit 127
 }
 
