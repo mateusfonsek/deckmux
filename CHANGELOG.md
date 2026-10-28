@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/mateusfonsek/deckmux/compare/v0.3.0...v0.3.1) (2026-10-28)
+
+
+### Correções
+
+* explicar como instalar o Claude Code e o uv quando faltam ([#6](https://github.com/mateusfonsek/deckmux/issues/6)) ([133d290](https://github.com/mateusfonsek/deckmux/commit/133d290c69b93aaf7895e584589bd5af910ac0cd))
+
 ## [0.3.0](https://github.com/mateusfonsek/deckmux/compare/v0.2.0...v0.3.0) (2026-10-28)
 
 
