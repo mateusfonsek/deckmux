@@ -51,10 +51,10 @@ Every folder with a `.workspace.json` becomes a group in the sidebar, with its o
 The workspace color follows into tabs, meetings and tasks: you can tell which project anything belongs to without reading.
 
 </td>
-<td width="50%"><img src=".github/readme/workspaces.gif" alt="A cd into another folder moves the terminal from Pessoal to Atlas in the sidebar"></td>
+<td width="50%"><img src=".github/readme/workspaces.webp" alt="The Atlas workspace screen: name, color, folder and the preview in the sidebar and in Claude Code's theme"></td>
 </tr>
 <tr>
-<td width="50%"><img src=".github/readme/contas.gif" alt="The Google, Slack and ClickUp MCP servers of Atlas and Nimbus, each connected to its workspace's account"></td>
+<td width="50%"><img src=".github/readme/contas.webp" alt="Atlas's MCP servers (Google, Slack and ClickUp), each connected to the workspace's account"></td>
 <td width="50%" valign="middle">
 
 ### 02 · The right account in every workspace
@@ -75,7 +75,7 @@ Deckmux knows when each Claude is working, has finished or is waiting for you, a
 The integration comes in through hooks passed with `--settings` on every `claude` launch. Nothing is written to your `~/.claude/settings.json`.
 
 </td>
-<td width="50%"><img src=".github/readme/agentes.gif" alt="Four agents in the sidebar; one of them turns to Esperando você (waiting for you), with the orange dot"></td>
+<td width="50%"><img src=".github/readme/agentes.webp" alt="The sidebar with each workspace's agents: working, waiting for you, and finished"></td>
 </tr>
 </table>
 
@@ -88,8 +88,6 @@ File tree, git changes and a side-by-side diff, opened at the focused terminal's
 ### 05 · The session comes back whole
 
 Reopen the app and the layout, tabs and splits, folders and every terminal's scrollback come back. Every terminal that was running Claude resumes the same conversation with `claude --resume`.
-
-<p align="center"><img src=".github/readme/janela-retomada.webp" width="100%" alt="After reopening Deckmux, the terminal resumes the conversation with claude --resume"></p>
 
 <table>
 <tr>
@@ -105,7 +103,7 @@ The task manager shows CPU and memory per window, workspace, item and terminal, 
 <td width="50%"><img src=".github/readme/gerenciador.webp" alt="The task manager with CPU and memory per workspace, item and terminal"></td>
 </tr>
 <tr>
-<td width="50%"><img src=".github/readme/avisos.gif" alt="The menu bar face lights the orange dot and opens the menu with what needs you"></td>
+<td width="50%"><img src=".github/readme/avisos.webp" alt="The menu bar face's menu: what needs you and the next meeting"></td>
 <td width="50%" valign="middle">
 
 ### 07 · It calls you when it needs you
