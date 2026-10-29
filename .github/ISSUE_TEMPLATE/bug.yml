@@ -1,0 +1,70 @@
+name: Problema
+description: Algo não funciona como deveria.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar. Antes, veja se já existe uma issue igual. Falha de segurança não vai aqui: veja o [SECURITY.md](https://github.com/mateusfonsek/deckmux/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu
+      description: O que você fez, o que esperava e o que aconteceu no lugar.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Abra a tela Hoje
+        2. Clique em …
+        3. Aparece …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão do Deckmux
+      description: Menu Deckmux → Sobre o Deckmux, ou `brew list --cask --versions deckmux`.
+      placeholder: "0.3.1"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: Versão do macOS
+      description: Menu Apple → Sobre Este Mac.
+      placeholder: "macOS 26.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Processador
+      options:
+        - Apple Silicon (M1, M2…)
+        - Intel
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Como instalou
+      options:
+        - Homebrew
+        - DMG ou zip da Release
+        - Compilei do código
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Versão do Claude Code (se o problema envolve o Claude)
+      description: "`claude --version`"
+  - type: textarea
+    id: extra
+    attributes:
+      label: Prints, logs ou algo mais
+      description: Tire dados pessoais (e-mails, nomes de clientes, caminhos privados) antes de colar.

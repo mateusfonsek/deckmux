@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Dúvida ou ajuda para configurar
+    url: https://github.com/mateusfonsek/deckmux/discussions
+    about: Perguntas sobre instalação, agenda, MCPs e uso vão para as Discussions.
+  - name: Falha de segurança
+    url: https://github.com/mateusfonsek/deckmux/security/advisories/new
+    about: Reporte em privado, não numa issue pública.
