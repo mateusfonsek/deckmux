@@ -31,7 +31,8 @@ and the state of every agent in sight, without hunting for it.
 ## Install
 
 ```bash
-brew install --cask mateusfonsek/tap/deckmux
+brew install --cask mateusfonsek/tap/deckmux   # install
+brew upgrade --cask deckmux                    # update (with Deckmux closed)
 ```
 
 <sub>Apple Silicon or Intel · macOS 14 or later · or download the <a href="https://github.com/mateusfonsek/deckmux/releases/latest"><code>.dmg</code> from the latest release</a> · or <a href="#build">build from source</a></sub>

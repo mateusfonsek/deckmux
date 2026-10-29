@@ -1,0 +1,30 @@
+<!doctype html><meta charset=utf-8>
+<!-- Source of Resources/dmg/background.tiff (the DMG window, 660 x 400).
+     Render it at 1x and 2x (660x400 and 1320x800, e.g. a browser screenshot
+     with zoom 2), then: tiffutil -cathidpicheck bg.png bg@2x.png -out background.tiff -->
+<style>
+  @font-face{font-family:DMRounded;src:local("SF Pro Rounded Semibold"),local("SF Pro Rounded")}
+  @font-face{font-family:DMText;src:local("SF Pro Text"),local("SF Pro")}
+  html,body{margin:0;width:660px;height:400px;overflow:hidden}
+  body{position:relative;background:linear-gradient(180deg,#0E1014 0%,#15181E 100%);font-family:DMRounded,sans-serif;color:#E6E8EB}
+  .light{position:absolute;border-radius:50%;filter:blur(60px)}
+  .grid{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px);background-size:16px 16px}
+  .vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(0,0,0,.35) 100%)}
+  .brand{position:absolute;left:26px;top:22px;display:flex;align-items:center;gap:9px}
+  .brand img{width:30px;height:30px}
+  .brand span{font-weight:600;font-size:19px;letter-spacing:-.2px}
+  .arrow{position:absolute;left:258px;top:183px;width:144px;height:28px}
+  .hint{position:absolute;left:0;right:0;top:322px;text-align:center;font-size:13px;color:#9AA0A9;font-family:DMText,sans-serif}
+  .hint b{color:#E6E8EB;font-weight:600}
+</style>
+<div class="light" style="left:60px;top:90px;width:220px;height:200px;background:#409CFF;opacity:.13"></div>
+<div class="light" style="left:420px;top:30px;width:220px;height:180px;background:#A78BFA;opacity:.11"></div>
+<div class="light" style="left:380px;top:220px;width:220px;height:170px;background:#2ECC87;opacity:.08"></div>
+<div class="grid"></div><div class="vignette"></div>
+<div class="brand"><img src="../../.github/readme/logo.svg"><span>Deckmux</span></div>
+<svg class="arrow" viewBox="0 0 144 28" fill="none">
+  <defs><linearGradient id="a" x1="4" x2="134" y1="0" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#22D3EE" stop-opacity="0"/><stop offset="1" stop-color="#22D3EE" stop-opacity=".85"/></linearGradient></defs>
+  <path d="M4 14 H134" stroke="url(#a)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M126 6 L135 14 L126 22" stroke="#22D3EE" stroke-opacity=".85" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+<div class="hint">Arraste o <b>Deckmux</b> para <b>Aplicativos</b></div>
