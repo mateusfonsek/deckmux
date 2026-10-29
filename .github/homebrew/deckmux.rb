@@ -34,7 +34,6 @@ cask "deckmux" do
     \e[90m╭──────────────╮\e[0m
     \e[90m│\e[0m \e[2;36m>_\e[0m           \e[90m│\e[0m   \e[1mDeckmux #{version}\e[0m
     \e[90m│\e[0m     \e[96m█  █\e[0m     \e[90m│\e[0m   Um terminal para quem roda vários agentes.
-    \e[90m│\e[0m     \e[96m█  █\e[0m     \e[90m│\e[0m
     \e[90m╰──────────────╯\e[0m   Abra pelo Launchpad ou: \e[1mopen -a Deckmux\e[0m
                        Novidades: https://github.com/mateusfonsek/deckmux/releases/tag/v#{version}
   EOS
