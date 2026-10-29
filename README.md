@@ -83,11 +83,15 @@ A integração entra por hooks passados com `--settings` em cada lançamento do 
 
 <p align="center"><img src=".github/readme/aba-codigo-diff.webp" width="100%" alt="A aba de código com as alterações do git e o diff lado a lado de retry.ts"></p>
 
+### 05 · A sessão volta inteira
+
+Ao reabrir o app voltam o layout, as abas e os splits, as pastas e o histórico de cada terminal. Cada terminal que rodava o Claude retoma a mesma conversa com `claude --resume`.
+
 <table>
 <tr>
 <td width="50%" valign="middle">
 
-### 05 · Leve de verdade
+### 06 · Leve de verdade
 
 Renderização pela libghostty com Metal. Terminal escondido deixa de desenhar e, depois de um tempo, devolve a memória da GPU.
 
@@ -100,7 +104,7 @@ O gerenciador de tarefas mostra CPU e memória por janela, workspace, item e ter
 <td width="50%"><img src=".github/readme/avisos.webp" alt="O menu do rosto na barra de menu: o que precisa de você e a próxima reunião"></td>
 <td width="50%" valign="middle">
 
-### 06 · Ele chama quando precisa de você
+### 07 · Ele chama quando precisa de você
 
 Um rosto na barra de menu dorme, trabalha, sorri quando termina e acende o ponto laranja quando um agente espera você. O menu dele lista o que precisa de atenção e a próxima reunião.
 
@@ -108,7 +112,7 @@ Um rosto na barra de menu dorme, trabalha, sorri quando termina e acende o ponto
 </tr>
 </table>
 
-### 07 · E o resto do dia
+### 08 · E o resto do dia
 
 <table>
 <tr>

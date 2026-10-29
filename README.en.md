@@ -85,11 +85,15 @@ File tree, git changes and a side-by-side diff, opened at the focused terminal's
 
 <p align="center"><img src=".github/readme/aba-codigo-diff.webp" width="100%" alt="The code tab with the git changes and the side-by-side diff of retry.ts"></p>
 
+### 05 · The session comes back whole
+
+Reopen the app and the layout, tabs and splits, folders and every terminal's scrollback come back. Every terminal that was running Claude resumes the same conversation with `claude --resume`.
+
 <table>
 <tr>
 <td width="50%" valign="middle">
 
-### 05 · Light for real
+### 06 · Light for real
 
 Rendering through libghostty and Metal. A hidden terminal stops drawing and, after a while, gives its GPU memory back.
 
@@ -102,7 +106,7 @@ The task manager shows CPU and memory per window, workspace, item and terminal, 
 <td width="50%"><img src=".github/readme/avisos.webp" alt="The menu bar face's menu: what needs you and the next meeting"></td>
 <td width="50%" valign="middle">
 
-### 06 · It calls you when it needs you
+### 07 · It calls you when it needs you
 
 A face in the menu bar sleeps, works, smiles when it finishes and lights an orange dot when an agent is waiting for you. Its menu lists what needs attention and the next meeting.
 
@@ -110,7 +114,7 @@ A face in the menu bar sleeps, works, smiles when it finishes and lights an oran
 </tr>
 </table>
 
-### 07 · And the rest of the day
+### 08 · And the rest of the day
 
 <table>
 <tr>
