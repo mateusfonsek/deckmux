@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/readme/icon.png" width="128" height="128" alt="Deckmux icon">
+<img src=".github/readme/logo.svg" width="160" height="160" alt="Deckmux icon">
 
 # Deckmux
 
@@ -37,14 +37,6 @@ brew install --cask mateusfonsek/tap/deckmux
 <sub>Apple Silicon or Intel · macOS 14 or later · or download the <a href="https://github.com/mateusfonsek/deckmux/releases/latest"><code>.dmg</code> from the latest release</a> · or <a href="#build">build from source</a></sub>
 
 The chats need [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) installed. If it is missing, Deckmux shows how to install it.
-
-## In 30 seconds
-
-Workspaces, accounts, agents, alerts and the Janelinha, in the real app (with made-up data).
-
-<p align="center">
-  <a href="https://github.com/mateusfonsek/deckmux/releases/latest"><img src=".github/readme/video-poster.webp" width="420" alt="Deckmux: a terminal for people who run many agents"></a>
-</p>
 
 ## Features
 
