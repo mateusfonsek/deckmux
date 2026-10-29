@@ -49,10 +49,10 @@ Cada pasta com um `.workspace.json` vira um grupo na barra lateral, com nome, co
 A cor do workspace segue para as abas, as reuniões e as tarefas: você sabe de que projeto é cada coisa sem ler.
 
 </td>
-<td width="50%"><img src=".github/readme/workspaces.gif" alt="Um cd para outra pasta move o terminal de Pessoal para Atlas na barra lateral"></td>
+<td width="50%"><img src=".github/readme/workspaces.webp" alt="A tela do workspace Atlas: nome, cor, pasta e a prévia na barra lateral e no tema do Claude Code"></td>
 </tr>
 <tr>
-<td width="50%"><img src=".github/readme/contas.gif" alt="Os MCPs de Google, Slack e ClickUp do Atlas e do Nimbus, cada um conectado à conta do seu workspace"></td>
+<td width="50%"><img src=".github/readme/contas.webp" alt="Os MCPs do Atlas (Google, Slack e ClickUp), cada um conectado à conta do workspace"></td>
 <td width="50%" valign="middle">
 
 ### 02 · A conta certa em cada workspace
@@ -73,7 +73,7 @@ O Deckmux sabe quando cada Claude está trabalhando, terminou ou espera você, e
 A integração entra por hooks passados com `--settings` em cada lançamento do `claude`. Nada é gravado no seu `~/.claude/settings.json`.
 
 </td>
-<td width="50%"><img src=".github/readme/agentes.gif" alt="Quatro agentes na barra lateral; um deles passa para Esperando você, com o ponto laranja"></td>
+<td width="50%"><img src=".github/readme/agentes.webp" alt="A barra lateral com os agentes de cada workspace: Claude trabalhando, Esperando você e Claude terminou"></td>
 </tr>
 </table>
 
@@ -83,17 +83,11 @@ A integração entra por hooks passados com `--settings` em cada lançamento do 
 
 <p align="center"><img src=".github/readme/aba-codigo-diff.webp" width="100%" alt="A aba de código com as alterações do git e o diff lado a lado de retry.ts"></p>
 
-### 05 · A sessão volta inteira
-
-Ao reabrir o app voltam o layout, as abas e os splits, as pastas e o histórico de cada terminal. Cada terminal que rodava o Claude retoma a mesma conversa com `claude --resume`.
-
-<p align="center"><img src=".github/readme/janela-retomada.webp" width="100%" alt="Depois de reabrir o Deckmux, o terminal retoma a conversa com claude --resume"></p>
-
 <table>
 <tr>
 <td width="50%" valign="middle">
 
-### 06 · Leve de verdade
+### 05 · Leve de verdade
 
 Renderização pela libghostty com Metal. Terminal escondido deixa de desenhar e, depois de um tempo, devolve a memória da GPU.
 
@@ -103,10 +97,10 @@ O gerenciador de tarefas mostra CPU e memória por janela, workspace, item e ter
 <td width="50%"><img src=".github/readme/gerenciador.webp" alt="O gerenciador de tarefas com CPU e memória por workspace, item e terminal"></td>
 </tr>
 <tr>
-<td width="50%"><img src=".github/readme/avisos.gif" alt="O rosto na barra de menu acende o ponto laranja e abre o menu com o que precisa de você"></td>
+<td width="50%"><img src=".github/readme/avisos.webp" alt="O menu do rosto na barra de menu: o que precisa de você e a próxima reunião"></td>
 <td width="50%" valign="middle">
 
-### 07 · Ele chama quando precisa de você
+### 06 · Ele chama quando precisa de você
 
 Um rosto na barra de menu dorme, trabalha, sorri quando termina e acende o ponto laranja quando um agente espera você. O menu dele lista o que precisa de atenção e a próxima reunião.
 
@@ -114,7 +108,7 @@ Um rosto na barra de menu dorme, trabalha, sorri quando termina e acende o ponto
 </tr>
 </table>
 
-### 08 · E o resto do dia
+### 07 · E o resto do dia
 
 <table>
 <tr>
