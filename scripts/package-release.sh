@@ -23,11 +23,21 @@ mkdir -p "$DIST"
 # ditto keeps the bundle's symlinks, extended attributes and signature intact.
 ditto -c -k --keepParent "$APP" "$DIST/$NAME.zip"
 
-STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
-ditto "$APP" "$STAGE/Deckmux.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Deckmux $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DIST/$NAME.dmg" >/dev/null
+# The window with the Deckmux background, built by dmgbuild (no Finder
+# scripting, so it works the same in CI). DMGBUILD may point at it; else
+# dmgbuild on the PATH, else uvx.
+if [ -n "${DMGBUILD:-}" ]; then
+  dmgbuild=("$DMGBUILD")
+elif command -v dmgbuild >/dev/null; then
+  dmgbuild=(dmgbuild)
+elif command -v uvx >/dev/null; then
+  dmgbuild=(uvx --from "dmgbuild==1.6.7" dmgbuild)
+else
+  echo "dmgbuild not found: pip install dmgbuild==1.6.7 (or install uv)" >&2
+  exit 1
+fi
+"${dmgbuild[@]}" -s "$ROOT/scripts/dmg-settings.py" -D app="$APP" -D background="$ROOT/Resources/dmg/background.tiff" \
+  "Deckmux $VERSION" "$DIST/$NAME.dmg" >/dev/null
 
 (cd "$DIST" && shasum -a 256 "$NAME.dmg" "$NAME.zip" > SHA256SUMS)
 cat "$DIST/SHA256SUMS"

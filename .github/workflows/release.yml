@@ -65,6 +65,13 @@ jobs:
           scripts/ensure-ghosttykit.sh
           swift test
 
+      # The DMG window (background, icon positions, volume icon) is written by dmgbuild.
+      - name: dmgbuild
+        run: |
+          python3 -m venv "$RUNNER_TEMP/dmgbuild"
+          "$RUNNER_TEMP/dmgbuild/bin/pip" install --quiet dmgbuild==1.6.7
+          echo "DMGBUILD=$RUNNER_TEMP/dmgbuild/bin/dmgbuild" >> "$GITHUB_ENV"
+
       - name: Build e empacotamento
         env:
           DECKMUX_BUILD_NUMBER: ${{ github.run_number }}
@@ -87,7 +94,8 @@ jobs:
             archs="$(lipo -archs "$mnt/Deckmux.app/Contents/$binary")"
             [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$binary: $archs"; exit 1; }
           done
-          test -L "$mnt/Applications"
+          test -L "$mnt/Aplicativos"
+          test -f "$mnt/.background.tiff" && test -f "$mnt/.VolumeIcon.icns" && test -f "$mnt/.DS_Store"
           hdiutil detach "$mnt"
 
       - name: Anexar à Release

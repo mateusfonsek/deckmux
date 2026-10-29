@@ -29,7 +29,8 @@ e o estado de todos os agentes à vista, sem você procurar.
 ## Instalar
 
 ```bash
-brew install --cask mateusfonsek/tap/deckmux
+brew install --cask mateusfonsek/tap/deckmux   # instalar
+brew upgrade --cask deckmux                    # atualizar (com o Deckmux fechado)
 ```
 
 <sub>Apple Silicon ou Intel · macOS 14 ou mais novo · ou baixe o <a href="https://github.com/mateusfonsek/deckmux/releases/latest"><code>.dmg</code> da última versão</a> · ou <a href="#compilar">compile do código</a></sub>
