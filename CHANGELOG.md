@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/mateusfonsek/deckmux/compare/v0.3.1...v0.4.0) (2026-10-29)
+
+
+### Novidades
+
+* DMG e instalação pelo brew com a identidade do Deckmux ([#12](https://github.com/mateusfonsek/deckmux/issues/12)) ([40c7088](https://github.com/mateusfonsek/deckmux/commit/40c7088d2c343e6e91bd67cdbd0177ded28b3e00))
+
 ## [0.3.1](https://github.com/mateusfonsek/deckmux/compare/v0.3.0...v0.3.1) (2026-10-28)
 
 
