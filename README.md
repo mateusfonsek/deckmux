@@ -69,14 +69,20 @@ Para gerar o `.dmg` e o `.zip` como na release: `scripts/package-release.sh --un
 
 O app é assinado ad-hoc, tanto o da release quanto o compilado. O macOS liga as permissões (Acessibilidade, Gravação de Tela) ao binário, então pode ser preciso concedê-las de novo depois de instalar uma versão nova.
 
-## Contribuir e versões
+## Privacidade
 
-Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/pt-br/): `feat:` para novidade, `fix:` para correção, e `docs:`, `refactor:`, `test:`, `ci:` ou `chore:` para o resto. Um `!` depois do tipo (`feat!:`) marca uma mudança que quebra compatibilidade. Os PRs entram por squash, então o título do PR é que precisa seguir o padrão (o CI confere).
+O Deckmux não tem conta, servidor nem telemetria. O que ele lê e para onde vai:
 
-As versões seguem [SemVer](https://semver.org/lang/pt-BR/) e saem pelo [release-please](https://github.com/googleapis/release-please):
+- **Calendário do Mac:** só com a sua permissão, para mostrar as reuniões. Fica no Mac.
+- **Google (opcional):** se você conectar uma conta num workspace, o login acontece no navegador, direto com o Google, e o token fica em `~/.config/google-workspace-mcp/<workspace>/`, com permissão 600. O app usa esse token para ler a agenda na API do Google, e o MCP do Google (do Claude Code) usa o mesmo token.
+- **Uso da conta do Claude (opcional):** com a Janelinha ligada, o app lê o token do Claude Code (o arquivo dele ou o item "Claude Code-credentials" do Keychain) para consultar o uso da conta na API da Anthropic. O token não é gravado em outro lugar; só os números de uso ficam guardados, na pasta da sessão.
+- **Sessão:** layout, pastas e o histórico dos terminais (até 4.000 linhas por terminal) ficam em `~/Library/Application Support/Deckmux`, no seu Mac.
+- **Configuração dos workspaces:** o app só grava o que você confirma na tela de revisão, que mostra cada arquivo antes: os do workspace (`CLAUDE.md`, `.mcp.json`, `.workspace.json`) e, quando a mudança pede, os do Claude Code (`~/.claude/settings.json` para pré-aprovar MCPs, `~/.claude.json`, `~/.claude/workspace.md`, temas em `~/.claude/themes`).
+- **Integração com o Claude Code nos terminais:** os hooks entram só no lançamento de cada `claude`, por `--settings`; nada é gravado na sua configuração.
 
-1. A cada push na `main`, o CI compila e roda os testes, e o release-please atualiza um PR de release com a próxima versão (`feat` sobe o minor, `fix` sobe o patch) e o `CHANGELOG.md`.
-2. Ao mergear esse PR, a tag `vX.Y.Z` e a Release são criadas, e o CI anexa o `.dmg`, o `.zip` e o `SHA256SUMS`.
+## Contribuir
+
+Veja o [CONTRIBUTING.md](CONTRIBUTING.md): compilar, testar sem mexer no app que você usa, padrão de commits e como as versões saem. Dúvidas vão para as [Discussions](https://github.com/mateusfonsek/deckmux/discussions); falhas de segurança, pelo [SECURITY.md](SECURITY.md).
 
 ## Licença
 

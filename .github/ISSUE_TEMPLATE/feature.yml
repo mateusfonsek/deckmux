@@ -1,0 +1,20 @@
+name: Sugestão
+description: Uma ideia para o Deckmux ficar melhor ou mais fácil de usar.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema isso resolve
+      description: O que você tenta fazer hoje e onde o Deckmux atrapalha ou não ajuda.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Como você imagina
+      description: Pode ser simples; um print ou rascunho ajuda.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: O que você faz hoje no lugar
