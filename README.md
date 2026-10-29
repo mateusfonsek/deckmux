@@ -18,10 +18,6 @@ e o estado de todos os agentes à vista, sem você procurar.
 
 [Instalar](#instalar) · [Recursos](#recursos) · [Primeiros passos](#primeiros-passos) · [Privacidade](#privacidade) · [Contribuir](CONTRIBUTING.md) · [English](README.en.md)
 
-<br>
-
-<a href="https://github.com/mateusfonsek/deckmux/releases/latest"><img src=".github/readme/video-poster.webp" width="360" alt="Deckmux: um terminal para quem roda vários agentes"></a>
-
 </div>
 
 <br>
@@ -39,6 +35,14 @@ brew install --cask mateusfonsek/tap/deckmux
 <sub>Apple Silicon ou Intel · macOS 14 ou mais novo · ou baixe o <a href="https://github.com/mateusfonsek/deckmux/releases/latest"><code>.dmg</code> da última versão</a> · ou <a href="#compilar">compile do código</a></sub>
 
 Para os chats, o [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) precisa estar instalado. Se não estiver, o Deckmux mostra como instalar.
+
+## Em 30 segundos
+
+Workspaces, contas, agentes, avisos e a Janelinha, no app de verdade (com dados fictícios).
+
+<p align="center">
+  <a href="https://github.com/mateusfonsek/deckmux/releases/latest"><img src=".github/readme/video-poster.webp" width="420" alt="Deckmux: um terminal para quem roda vários agentes"></a>
+</p>
 
 ## Recursos
 
