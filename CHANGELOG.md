@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/mateusfonsek/deckmux/compare/v0.4.0...v0.4.1) (2026-11-03)
+
+
+### Correções
+
+* Claude aberto por uma função do .zshrc volta a ter o ícone e o estado ([#15](https://github.com/mateusfonsek/deckmux/issues/15)) ([14e4c73](https://github.com/mateusfonsek/deckmux/commit/14e4c73c228cca7482f773a7d7c4f3ab1dfeff2e))
+
 ## [0.4.0](https://github.com/mateusfonsek/deckmux/compare/v0.3.1...v0.4.0) (2026-10-29)
 
 
