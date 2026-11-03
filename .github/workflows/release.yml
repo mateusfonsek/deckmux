@@ -11,6 +11,11 @@ on:
       tag:
         description: Tag existente para recompilar e reanexar os arquivos (ex. v0.2.0)
         required: true
+      runner:
+        description: Máquina do empacotamento (a Intel serve quando faltam máquinas Apple Silicon; o app sai universal igual)
+        type: choice
+        options: [macos-26, macos-26-intel]
+        default: macos-26
 
 permissions: {}
 
@@ -42,7 +47,7 @@ jobs:
     if: >-
       always() &&
       (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
-    runs-on: macos-26
+    runs-on: ${{ inputs.runner || 'macos-26' }}
     timeout-minutes: 45
     permissions:
       contents: write
