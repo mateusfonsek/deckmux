@@ -159,6 +159,7 @@ final class NextMeetingModel: ObservableObject {
 /// window, as a titlebar does.
 struct TopBarView: View {
     @ObservedObject var model: NextMeetingModel
+    @ObservedObject var caffeine: CaffeineController
     let showAgenda: () -> Void
 
     var body: some View {
@@ -168,6 +169,7 @@ struct TopBarView: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
                 .allowsHitTesting(false)
+            CaffeineButton(caffeine: caffeine)
             Spacer(minLength: 12)
             meeting
         }
