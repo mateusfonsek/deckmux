@@ -30,6 +30,14 @@ public enum SystemCommands {
             + " && /bin/mv -f \"$tmp\" \(sudoersPath)"
     }
 
+    /// Whether `pmset -g` lists "SleepDisabled 1" (sleep is off).
+    public static func sleepDisabled(pmsetOutput: String) -> Bool {
+        pmsetOutput.split(separator: "\n").contains { line in
+            let words = line.split(whereSeparator: \.isWhitespace)
+            return words.first == "SleepDisabled" && words.last == "1"
+        }
+    }
+
     public static let removeScript = "/bin/rm -f \(sudoersPath)"
 
     /// For `/bin/sh -c`, with Deckmux's PID as $1: once Deckmux is gone, sleep

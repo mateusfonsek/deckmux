@@ -34,9 +34,10 @@ final class SleepGuard {
         isEngaged = true
     }
 
-    /// Idempotent.
-    func release() {
-        guard isEngaged else { return }
+    /// Idempotent. false when sleep could not be turned back on (the rule is gone).
+    @discardableResult
+    func release() -> Bool {
+        guard isEngaged else { return true }
         let pmset = SystemProcess.disableSleep(false)
         if !pmset.succeeded { Self.logger.error("pmset disablesleep 0 failed: \(pmset.output, privacy: .public)") }
         if assertion != 0 { IOPMAssertionRelease(assertion) }
@@ -44,12 +45,22 @@ final class SleepGuard {
         watcher?.terminate()
         watcher = nil
         isEngaged = false
+        return pmset.succeeded
     }
 
-    /// At launch: a crash may have left sleep disabled, and the setting survives reboots.
-    static func restoreSleepAtLaunch() {
-        guard SudoersRule.isInstalled() else { return }
-        DispatchQueue.global(qos: .utility).async { SystemProcess.disableSleep(false) }
+    /// At launch: a crash may have left sleep disabled, and the setting survives
+    /// reboots. `done(false)` when sleep is still disabled and Deckmux cannot fix it.
+    static func restoreSleepAtLaunch(_ done: @escaping @MainActor (Bool) -> Void) {
+        DispatchQueue.global(qos: .utility).async {
+            guard isSleepDisabled() else { return }
+            let restored = SudoersRule.isInstalled() && SystemProcess.disableSleep(false).succeeded
+            DispatchQueue.main.async { MainActor.assumeIsolated { done(restored) } }
+        }
+    }
+
+    /// `pmset -g` lists "SleepDisabled 1" while sleep is off.
+    nonisolated static func isSleepDisabled() -> Bool {
+        SystemCommands.sleepDisabled(pmsetOutput: SystemProcess.run("/usr/bin/pmset", ["-g"]).output)
     }
 
     /// A child process outlives Deckmux on macOS; it ignores SIGHUP and polls our PID.

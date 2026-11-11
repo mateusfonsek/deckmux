@@ -63,3 +63,11 @@ private func summary(_ reason: CaffeineStopReason, peak: Int) -> CaffeineSummary
     #expect(SystemCommands.watcherScript.contains("sudo -n /usr/bin/pmset -a disablesleep 0"))
     #expect(SystemCommands.watcherScript.contains("trap '' HUP"))
 }
+
+@Test func readsSleepDisabledFromPmset() {
+    let on = "System-wide power settings:\n SleepDisabled\t\t1\nCurrently in use:\n standby              1\n"
+    let off = "System-wide power settings:\n SleepDisabled\t\t0\nCurrently in use:\n sleep                1\n"
+    #expect(SystemCommands.sleepDisabled(pmsetOutput: on))
+    #expect(!SystemCommands.sleepDisabled(pmsetOutput: off))
+    #expect(!SystemCommands.sleepDisabled(pmsetOutput: "Currently in use:\n standby 1\n"))
+}

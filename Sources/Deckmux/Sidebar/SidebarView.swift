@@ -282,8 +282,6 @@ private struct SidebarRow: View {
     @State private var hovered = false
     /// The customization popover, and the field it focuses first.
     @State private var editing: ChatCustomizationEditor.Field?
-    @State private var glowing = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var color: Color { workspace?.color ?? .secondary }
 
@@ -425,14 +423,7 @@ private struct SidebarRow: View {
     /// Under the café: a thin outline in the workspace's color, breathing slowly.
     @ViewBuilder private var caffeineOutline: some View {
         if effect != nil {
-            RoundedRectangle(cornerRadius: Theme.Radius.row)
-                .strokeBorder(color.opacity(reduceMotion ? 0.4 : (glowing ? 0.45 : 0.25)), lineWidth: 1)
-                .allowsHitTesting(false)
-                .onAppear {
-                    guard !reduceMotion else { return }
-                    withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) { glowing = true }
-                }
-                .onDisappear { glowing = false }
+            CaffeineOutline(color: NSColor(color)).allowsHitTesting(false)
         }
     }
 
@@ -444,6 +435,81 @@ private struct SidebarRow: View {
             }
         } else if hovered {
             RoundedRectangle(cornerRadius: Theme.Radius.row).fill(Color.primary.opacity(0.05))
+        }
+    }
+}
+
+/// The café's outline around a sidebar row. The breathing is a Core Animation
+/// animation on the layer, run by the render server, for the same reason as
+/// ClaudeMark: SwiftUI's repeatForever re-renders the sidebar every frame.
+struct CaffeineOutline: NSViewRepresentable {
+    let color: NSColor
+
+    func makeNSView(context: Context) -> CaffeineOutlineView { CaffeineOutlineView() }
+
+    func updateNSView(_ view: CaffeineOutlineView, context: Context) { view.color = color }
+}
+
+final class CaffeineOutlineView: NSView {
+    private let outline = CAShapeLayer()
+    private static let breatheKey = "breathe"
+
+    var color: NSColor = .secondaryLabelColor {
+        didSet { if color != oldValue { applyColor() } }
+    }
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        outline.fillColor = nil
+        outline.lineWidth = 1
+        outline.opacity = 0.4
+        layer?.addSublayer(outline)
+        applyColor()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        outline.frame = bounds
+        // Inset by half the line, so the whole stroke stays inside the row.
+        outline.path = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+                              cornerWidth: Theme.Radius.row, cornerHeight: Theme.Radius.row, transform: nil)
+        CATransaction.commit()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColor()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateBreathing()
+    }
+
+    private func applyColor() {
+        effectiveAppearance.performAsCurrentDrawingAppearance { outline.strokeColor = color.cgColor }
+    }
+
+    /// Breathes only while on screen, and not at all with Reduce Motion.
+    private func updateBreathing() {
+        let breathes = window != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if breathes, outline.animation(forKey: Self.breatheKey) == nil {
+            let animation = CABasicAnimation(keyPath: "opacity")
+            animation.fromValue = 0.25
+            animation.toValue = 0.45
+            animation.duration = 3
+            animation.autoreverses = true
+            animation.repeatCount = .infinity
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            outline.add(animation, forKey: Self.breatheKey)
+        } else if !breathes {
+            outline.removeAnimation(forKey: Self.breatheKey)
         }
     }
 }

@@ -70,8 +70,13 @@ final class CaffeineController: ObservableObject {
         }
     }
 
-    /// A crash may have left sleep disabled.
-    func start() { SleepGuard.restoreSleepAtLaunch() }
+    /// A crash may have left sleep disabled; without the rule Deckmux cannot
+    /// undo it, so it says how.
+    func start() {
+        SleepGuard.restoreSleepAtLaunch { [weak self] restored in
+            if !restored { self?.notifySleepStuck() }
+        }
+    }
 
     var isRuleInstalled: Bool { SudoersRule.isInstalled() }
 
@@ -110,9 +115,12 @@ final class CaffeineController: ObservableObject {
             publish()
             return
         }
-        timer = Timer.scheduledTimer(withTimeInterval: Self.tick, repeats: true) { [weak self] _ in
+        // Common modes: the rails keep ticking while an alert or a menu is open.
+        let timer = Timer(timeInterval: Self.tick, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.update() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
         update()
     }
 
@@ -169,8 +177,9 @@ final class CaffeineController: ObservableObject {
         timer = nil
         watcher.stop()
         subagents = [:]
-        sleepGuard.release()
+        let restored = sleepGuard.release()
         publish()
+        if !restored { notifySleepStuck() }
         Self.logger.info("Café off: \(CaffeineCopy.reason(summary.reason), privacy: .public)")
         if summary.reason != .user { notify(summary) }
     }
@@ -249,6 +258,17 @@ final class CaffeineController: ObservableObject {
         let request = UNNotificationRequest(identifier: Self.notificationID, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error { Self.logger.error("Could not post the café notification: \(error, privacy: .public)") }
+        }
+    }
+
+    /// Sleep is still off and only the user can turn it back on.
+    private func notifySleepStuck() {
+        let content = UNMutableNotificationContent()
+        content.title = "O Mac continua sem dormir"
+        content.body = "Não deu para religar o repouso. No Terminal, rode: sudo pmset -a disablesleep 0"
+        let request = UNNotificationRequest(identifier: "\(Self.notificationID)-stuck", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error { Self.logger.error("Could not post the stuck-sleep notification: \(error, privacy: .public)") }
         }
     }
 
