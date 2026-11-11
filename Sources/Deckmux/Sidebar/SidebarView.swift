@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxCaffeine
 import DeckmuxChat
 import SwiftUI
 
@@ -8,6 +9,7 @@ import SwiftUI
 struct SidebarView: View {
     @ObservedObject var deck: Deck
     @ObservedObject var meetings: NextMeetingModel
+    @ObservedObject var caffeine: CaffeineController
     let openPalette: () -> Void
 
     @AppStorage("sidebar.collapsedWorkspaces") private var collapsedRaw = ""
@@ -111,6 +113,7 @@ struct SidebarView: View {
 
     private func row(_ item: DeckItem, workspace: Workspace?, shortcut: Int?) -> some View {
         SidebarRow(item: item, workspace: workspace, isSelected: deck.page == nil && deck.selectedID == item.id,
+                   effect: caffeine.snapshot.work(ofItem: item.id),
                    shortcut: shortcut, onSelect: { deck.select(item) }, onClose: { deck.close(item) },
                    onNewHere: {
                        var config = Ghostty.SurfaceConfiguration()
@@ -267,6 +270,8 @@ private struct SidebarRow: View {
     @ObservedObject var item: DeckItem
     let workspace: Workspace?
     let isSelected: Bool
+    /// What keeps this item awake under the café; nil when it is not under its effect.
+    let effect: ChatWork?
     /// 1…9: the ⌘ number that selects this item.
     let shortcut: Int?
     let onSelect: () -> Void
@@ -277,6 +282,8 @@ private struct SidebarRow: View {
     @State private var hovered = false
     /// The customization popover, and the field it focuses first.
     @State private var editing: ChatCustomizationEditor.Field?
+    @State private var glowing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var color: Color { workspace?.color ?? .secondary }
 
@@ -300,6 +307,7 @@ private struct SidebarRow: View {
         .padding(.trailing, 6)
         .frame(height: 44)
         .background(background)
+        .overlay { caffeineOutline }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onHover { hovered = $0 }
@@ -362,6 +370,8 @@ private struct SidebarRow: View {
             case .needsInput: Text("Esperando você").foregroundStyle(Theme.attention).fontWeight(.medium)
             case .finished: Text("Claude terminou").foregroundStyle(Theme.attention)
             }
+        } else if case .subagents(let n)? = effect, !item.claudeWorking {
+            Text(n == 1 ? "1 sub-agente" : "\(n) sub-agentes").foregroundStyle(Theme.claude)
         } else if item.claudeWorking {
             Text("Claude trabalhando…").foregroundStyle(Theme.claude)
         } else {
@@ -404,6 +414,25 @@ private struct SidebarRow: View {
         } else if item.attention != nil {
             Circle().fill(Theme.attention).frame(width: 8, height: 8)
                 .help("O Claude está esperando você")
+        } else if effect != nil {
+            Image(systemName: "cup.and.saucer.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .help("Mantido acordado pelo café")
+        }
+    }
+
+    /// Under the café: a thin outline in the workspace's color, breathing slowly.
+    @ViewBuilder private var caffeineOutline: some View {
+        if effect != nil {
+            RoundedRectangle(cornerRadius: Theme.Radius.row)
+                .strokeBorder(color.opacity(reduceMotion ? 0.4 : (glowing ? 0.45 : 0.25)), lineWidth: 1)
+                .allowsHitTesting(false)
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) { glowing = true }
+                }
+                .onDisappear { glowing = false }
         }
     }
 

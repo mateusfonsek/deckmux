@@ -388,6 +388,12 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         portal.setAttention(value != nil, for: tab)
     }
 
+    /// The café's cup in place of the terminal icon while it keeps this terminal's chat awake.
+    func setCaffeine(_ on: Bool, forTerminal id: UUID) {
+        guard let surface = terminal(withID: id), let tab = tabId(of: surface) else { return }
+        bonsplit.updateTab(tab, icon: .some(on ? "cup.and.saucer.fill" : Self.tabIcon))
+    }
+
     // MARK: Closing terminals
 
     /// Closes the tab holding `surface`, asking first when a process is still running.

@@ -59,6 +59,8 @@ final class CaffeineController: ObservableObject {
     private let watcher = SubagentWatcher()
     private var subagents: [UUID: [SubagentInfo]] = [:]
     private var timer: Timer?
+    /// Terminals whose tab shows the cup.
+    private var markedTabs: Set<UUID> = []
 
     init(deck: Deck) {
         self.deck = deck
@@ -218,7 +220,19 @@ final class CaffeineController: ObservableObject {
             next.chats = chats()
             next.power = PowerSource.read()
         }
+        markTabs(Set(next.chats.map(\.id)))
         if next != snapshot { snapshot = next }
+    }
+
+    /// Only the terminals that entered or left the effect.
+    private func markTabs(_ terminals: Set<UUID>) {
+        guard terminals != markedTabs else { return }
+        for item in deck.items {
+            for (id, _) in item.layout.claudeSessions where terminals.contains(id) != markedTabs.contains(id) {
+                item.layout.setCaffeine(terminals.contains(id), forTerminal: id)
+            }
+        }
+        markedTabs = terminals
     }
 
     // MARK: Telling the user

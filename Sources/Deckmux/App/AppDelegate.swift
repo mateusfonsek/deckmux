@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let status = AgentStatusItem(deck: window.deck, meetings: window.nextMeeting, tasks: window.tasks,
                                      reveal: { hooks.reveal(terminal: $0) }) { [weak self] in self?.bringToFront() }
         statusItem = status
+        status.caffeine = window.caffeine
         status.start()
         hotkey = GlobalHotkey { [weak self] in self?.toggleFromHotkey() }
         // The Janelinha: off by default, switched from the menus.

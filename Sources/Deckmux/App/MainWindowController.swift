@@ -76,7 +76,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
         window.contentView = root
         window.center()
         super.init(window: window)
-        let sidebar = PageHostingView(rootView: SidebarView(deck: deck, meetings: nextMeeting) { [weak self] in self?.showPalette() })
+        let sidebar = PageHostingView(rootView: SidebarView(deck: deck, meetings: nextMeeting, caffeine: caffeine) { [weak self] in self?.showPalette() })
         sidebar.frame = NSRect(x: 0, y: 0, width: Self.sidebarWidth, height: size.height)
         sidebar.autoresizingMask = [.height]
         root.addSubview(sidebar)
