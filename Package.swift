@@ -36,6 +36,9 @@ let package = Package(
         // Finding the user's executables (claude, uvx) on their PATH; Foundation only.
         .target(name: "DeckmuxShell", path: "Sources/DeckmuxShell", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "DeckmuxShellTests", dependencies: ["DeckmuxShell"], path: "Tests/DeckmuxShellTests"),
+        // The café: keeping the Mac awake until the chats finish (state, work rule, copy, system commands); Foundation only.
+        .target(name: "DeckmuxCaffeine", dependencies: ["DeckmuxMonitor"], path: "Sources/DeckmuxCaffeine", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "DeckmuxCaffeineTests", dependencies: ["DeckmuxCaffeine", "DeckmuxMonitor"], path: "Tests/DeckmuxCaffeineTests"),
         // `deckmux hook <event>` and `deckmux task …`, bundled as Contents/Resources/bin/deckmux.
         .executableTarget(name: "DeckmuxCLI", dependencies: ["DeckmuxTasks"], path: "Sources/DeckmuxCLI",
                           swiftSettings: [.swiftLanguageMode(.v5)]),
@@ -51,6 +54,7 @@ let package = Package(
                 "DeckmuxChat",
                 "DeckmuxCalendar",
                 "DeckmuxShell",
+                "DeckmuxCaffeine",
                 .product(name: "Bonsplit", package: "Bonsplit"),
                 .product(name: "Highlightr", package: "Highlightr"),
             ],
