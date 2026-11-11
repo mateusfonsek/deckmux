@@ -21,12 +21,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
     let workspacesModel: WorkspacesModel
     let nextMeeting: NextMeetingModel
     let tasks = TasksModel()
+    /// Keeps the Mac awake until the chats finish.
+    let caffeine: CaffeineController
     /// Hoje and the Workspaces tab, over the terminals while open.
     private var pageViews: [Deck.Page: NSView] = [:]
     private var shownPage: NSView?
 
     init(ghostty: Ghostty.App, workspaces: WorkspaceStore) {
         deck = Deck(ghostty: ghostty, workspaces: workspaces)
+        caffeine = CaffeineController(deck: deck)
         // Tabs wear their workspace's color.
         TerminalLayout.workspaceColor = { [weak workspaces] path in
             MainActor.assumeIsolated { workspaces?.workspace(containing: path)?.manifest.color }
