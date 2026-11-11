@@ -221,7 +221,12 @@ final class CaffeineController: ObservableObject {
             next.power = PowerSource.read()
         }
         markTabs(Set(next.chats.map(\.id)))
-        if next != snapshot { snapshot = next }
+        if next != snapshot {
+            snapshot = next
+            #if DEBUG
+            print("[cafe] \(next.phase) chats=\(next.chats.map { "\($0.name):\($0.work)" }) power=\(next.power)")
+            #endif
+        }
     }
 
     /// Only the terminals that entered or left the effect.

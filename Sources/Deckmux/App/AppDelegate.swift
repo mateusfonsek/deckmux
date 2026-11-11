@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // For automated checks, which cannot click: open the task manager at launch
         // ("processes" also ticks Processos).
         let environment = ProcessInfo.processInfo.environment
+        DebugCommands.start(window: window)
         if let open = environment["DECKMUX_OPEN_TASK_MANAGER"] {
             TaskManagerWindowController.shared?.exposeForChecks()
             TaskManagerWindowController.shared?.show(includingProcesses: open == "processes")
