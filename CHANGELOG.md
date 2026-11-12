@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/mateusfonsek/deckmux/compare/v0.4.1...v0.5.0) (2026-11-12)
+
+
+### Novidades
+
+* café mantém o Mac acordado até os chats terminarem ([#19](https://github.com/mateusfonsek/deckmux/issues/19)) ([f4d9219](https://github.com/mateusfonsek/deckmux/commit/f4d9219a4fdc24b4c66933898258862a3e8ba707))
+
 ## [0.4.1](https://github.com/mateusfonsek/deckmux/compare/v0.4.0...v0.4.1) (2026-11-03)
 
 
