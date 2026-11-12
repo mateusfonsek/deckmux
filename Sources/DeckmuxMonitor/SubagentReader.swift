@@ -47,7 +47,9 @@ public enum SubagentReader {
                                 description: object["description"] as? String ?? "",
                                 model: object["model"] as? String,
                                 startedAt: startedAt, updatedAt: updatedAt,
-                                isFinished: isFinished(transcript: transcript))
+                                // Claude Code writes "finished" to the meta file; the
+                                // transcript's last line can outgrow the tail we read.
+                                isFinished: object["finished"] as? Bool == true || isFinished(transcript: transcript))
         }
         return Array(agents.sorted { $0.updatedAt > $1.updatedAt }.prefix(limit))
     }

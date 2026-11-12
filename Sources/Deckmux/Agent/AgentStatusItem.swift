@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import DeckmuxCaffeine
 import DeckmuxCalendar
 import OSLog
 import SwiftUI
@@ -59,6 +60,16 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
     private var status = AgentStatus.idle
     private var waiting = 0
     private var frame = 0
+    /// The café: a cup on the face while it keeps the Mac awake.
+    var caffeine: CaffeineController? {
+        didSet {
+            caffeineObserver = caffeine?.$snapshot
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.update() }
+        }
+    }
+    private var caffeineObserver: AnyCancellable?
+    private var showsCaffeine = false
     private var timer: Timer?
     private var deckObserver: AnyCancellable?
     /// The Janelinha: its state and the switch, set by the app delegate.
@@ -113,13 +124,15 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
     private func update() {
         let now = AgentStatus.current(in: deck)
         let waitingNow = deck.items.reduce(0) { $0 + $1.layout.attention.count }
-        guard now != status || now == .working || waitingNow != waiting else { return }
+        let caffeineNow = caffeine?.snapshot.isOn == true
+        guard now != status || now == .working || waitingNow != waiting || caffeineNow != showsCaffeine else { return }
         frame = now == .working && status == .working ? frame + 1 : 0
         if now != status { Self.logger.info("Menu bar: \(now.label, privacy: .public)") }
         status = now
         waiting = waitingNow
+        showsCaffeine = caffeineNow
         guard let button = item.button else { return }
-        button.image = AgentFace.image(now, frame: frame)
+        button.image = AgentFace.image(now, frame: frame, caffeine: caffeineNow)
         button.toolTip = now.label
         // Two or more terminals waiting: the count next to the face, as Slack does.
         if waitingNow >= 2 {
@@ -146,6 +159,22 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
         header.view = StatusMenuRowView(.init(leading: .face(status), title: status.label, subtitle: summary(), selectable: false),
                                         height: StatusMenuRowView.headerHeight)
         menu.addItem(header)
+
+        // The café, right under the state.
+        if let caffeine {
+            menu.addItem(.separator())
+            let toggle = NSMenuItem(title: "Manter acordado até terminar", action: #selector(toggleCaffeine(_:)), keyEquivalent: "")
+            toggle.target = self
+            toggle.state = caffeine.snapshot.isOn ? .on : .off
+            toggle.image = NSImage(systemSymbolName: caffeine.snapshot.isOn ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: nil)
+            menu.addItem(toggle)
+            if let line = caffeineLine(caffeine.snapshot, now: now) {
+                let detail = NSMenuItem(title: line, action: nil, keyEquivalent: "")
+                detail.isEnabled = false
+                detail.indentationLevel = 1
+                menu.addItem(detail)
+            }
+        }
 
         // The next meeting, within a day (same rules as the top bar).
         if let event = meetings.next, event.start.timeIntervalSince(now) < 24 * 60 * 60 {
@@ -348,6 +377,18 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
 
     @objc private func toggleMonitor(_ sender: Any?) { onToggleMonitor() }
 
+    @objc private func toggleCaffeine(_ sender: Any?) { caffeine?.toggle() }
+
+    /// "3 chats · ligado há 1h 24m", or "esperando um chat…".
+    private func caffeineLine(_ snapshot: CaffeineSnapshot, now: Date) -> String? {
+        switch snapshot.phase {
+        case .off: nil
+        case .waiting: "esperando um chat…"
+        case .active(let since, _):
+            "\(CaffeineCopy.chats(snapshot.chats.count)) · ligado há \(CaffeineCopy.elapsed(now.timeIntervalSince(since)))"
+        }
+    }
+
     @objc private func openTaskManager(_ sender: Any?) { TaskManagerWindowController.shared?.show() }
 }
 
@@ -386,7 +427,7 @@ enum AgentFace {
 
     /// The face at `size` points. With `ink`, a plain image in that color (the
     /// menu's header); without it, a template image for the menu bar.
-    static func image(_ status: AgentStatus, frame: Int = 0, size: CGFloat = AgentFace.size, ink: NSColor? = nil) -> NSImage {
+    static func image(_ status: AgentStatus, frame: Int = 0, size: CGFloat = AgentFace.size, ink: NSColor? = nil, caffeine: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: true) { _ in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             context.scaleBy(x: size / 24, y: size / 24)
@@ -403,11 +444,26 @@ enum AgentFace {
                 (status == .needsInput ? NSColor.systemOrange : ink).set()
                 NSBezierPath(ovalIn: circle(dot, radius: 2.7)).fill()
             }
+            if caffeine { drawCup(in: context, ink: ink) }
             return true
         }
         image.isTemplate = ink == nil && status != .needsInput
         image.accessibilityDescription = status.label
         return image
+    }
+
+    /// The café's cup on the lower right corner, cut out of the face like the dot.
+    private static func drawCup(in context: CGContext, ink: NSColor) {
+        let rect = NSRect(x: 14.6, y: 13.4, width: 10, height: 10)
+        context.setBlendMode(.clear)
+        NSBezierPath(roundedRect: rect.insetBy(dx: -0.6, dy: -0.6), xRadius: 3, yRadius: 3).fill()
+        context.setBlendMode(.normal)
+        let config = NSImage.SymbolConfiguration(pointSize: 9, weight: .bold).applying(.init(paletteColors: [ink]))
+        guard let cup = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return }
+        let fitted = cup.size.width > 0 ? NSRect(x: rect.midX - cup.size.width / 2, y: rect.midY - cup.size.height / 2,
+                                                 width: cup.size.width, height: cup.size.height) : rect
+        cup.draw(in: fitted, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 
     private static func drawFace(_ status: AgentStatus, frame: Int) {

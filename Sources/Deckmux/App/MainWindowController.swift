@@ -21,12 +21,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
     let workspacesModel: WorkspacesModel
     let nextMeeting: NextMeetingModel
     let tasks = TasksModel()
+    /// Keeps the Mac awake until the chats finish.
+    let caffeine: CaffeineController
     /// Hoje and the Workspaces tab, over the terminals while open.
     private var pageViews: [Deck.Page: NSView] = [:]
     private var shownPage: NSView?
 
     init(ghostty: Ghostty.App, workspaces: WorkspaceStore) {
         deck = Deck(ghostty: ghostty, workspaces: workspaces)
+        caffeine = CaffeineController(deck: deck)
         // Tabs wear their workspace's color.
         TerminalLayout.workspaceColor = { [weak workspaces] path in
             MainActor.assumeIsolated { workspaces?.workspace(containing: path)?.manifest.color }
@@ -73,7 +76,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
         window.contentView = root
         window.center()
         super.init(window: window)
-        let sidebar = PageHostingView(rootView: SidebarView(deck: deck, meetings: nextMeeting) { [weak self] in self?.showPalette() })
+        let sidebar = PageHostingView(rootView: SidebarView(deck: deck, meetings: nextMeeting, caffeine: caffeine) { [weak self] in self?.showPalette() })
         sidebar.frame = NSRect(x: 0, y: 0, width: Self.sidebarWidth, height: size.height)
         sidebar.autoresizingMask = [.height]
         root.addSubview(sidebar)
@@ -82,7 +85,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
         separator.frame = NSRect(x: Self.sidebarWidth - 1, y: 0, width: 1, height: size.height)
         separator.autoresizingMask = [.height]
         root.addSubview(separator)
-        let topBar = PageHostingView(rootView: TopBarView(model: nextMeeting) { [weak self] in
+        let topBar = PageHostingView(rootView: TopBarView(model: nextMeeting, caffeine: caffeine) { [weak self] in
             self?.deck.show(.today)
             self?.nextMeeting.guidePresented = true
         })

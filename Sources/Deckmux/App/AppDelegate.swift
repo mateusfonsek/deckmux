@@ -39,12 +39,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         observeAppearance()
         let window = MainWindowController(ghostty: ghostty, workspaces: workspaces)
         mainWindow = window
+        window.caffeine.start()
         let hooks = ClaudeHookCenter(deck: window.deck)
         claudeHooks = hooks
         hooks.start()
         let status = AgentStatusItem(deck: window.deck, meetings: window.nextMeeting, tasks: window.tasks,
                                      reveal: { hooks.reveal(terminal: $0) }) { [weak self] in self?.bringToFront() }
         statusItem = status
+        status.caffeine = window.caffeine
         status.start()
         hotkey = GlobalHotkey { [weak self] in self?.toggleFromHotkey() }
         // The Janelinha: off by default, switched from the menus.
@@ -62,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // For automated checks, which cannot click: open the task manager at launch
         // ("processes" also ticks Processos).
         let environment = ProcessInfo.processInfo.environment
+        DebugCommands.start(window: window)
         if let open = environment["DECKMUX_OPEN_TASK_MANAGER"] {
             TaskManagerWindowController.shared?.exposeForChecks()
             TaskManagerWindowController.shared?.show(includingProcesses: open == "processes")
@@ -126,7 +129,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if item.action == #selector(toggleMonitor(_:)) {
             item.state = MainActor.assumeIsolated { monitor?.isEnabled == true } ? .on : .off
         }
+        if item.action == #selector(removeCaffeineRule(_:)) {
+            // Only once the café's sudoers rule is installed.
+            let installed = MainActor.assumeIsolated { mainWindow?.caffeine.isRuleInstalled == true }
+            item.isHidden = !installed
+            return installed
+        }
         return true
+    }
+
+    @MainActor @objc private func removeCaffeineRule(_ sender: Any?) {
+        mainWindow?.caffeine.removeRule()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -134,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             autosaveTimer?.invalidate()
             // Claude sessions end as their terminals close; keep their IDs.
             claudeHooks?.isTerminating = true
+            mainWindow?.caffeine.shutdown()
             saveSession(includingScrollback: true)
             SessionStore.flushScrollback()
             claudeHooks?.stop()
@@ -245,6 +259,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let resumeItem = appMenu.addItem(withTitle: "Retomar conversas do Claude ao reabrir", action: #selector(toggleResumeClaude(_:)), keyEquivalent: "")
         resumeItem.target = self
         resumeItem.state = SessionSettings.resumesClaudeSessions ? .on : .off
+        let cafeRuleItem = appMenu.addItem(withTitle: "Remover permissão do café…", action: #selector(removeCaffeineRule(_:)), keyEquivalent: "")
+        cafeRuleItem.target = self
         // The system-wide shortcut that shows Deckmux.
         let hotkeyItem = appMenu.addItem(withTitle: "Atalho para mostrar o Deckmux", action: nil, keyEquivalent: "")
         let hotkeyMenu = NSMenu()
@@ -332,9 +348,12 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let terminal = (response.notification.request.content.userInfo[ClaudeHookCenter.terminalKey] as? String).flatMap(UUID.init(uuidString:))
+        let isCaffeine = response.notification.request.identifier == CaffeineController.notificationID
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                if let terminal {
+                if isCaffeine {
+                    self.bringToFront()
+                } else if let terminal {
                     self.claudeHooks?.reveal(terminal: terminal)
                 } else {
                     self.ghostty.handleUserNotification(response: response)

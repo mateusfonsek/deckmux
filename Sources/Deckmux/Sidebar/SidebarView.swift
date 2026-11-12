@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxCaffeine
 import DeckmuxChat
 import SwiftUI
 
@@ -8,6 +9,7 @@ import SwiftUI
 struct SidebarView: View {
     @ObservedObject var deck: Deck
     @ObservedObject var meetings: NextMeetingModel
+    @ObservedObject var caffeine: CaffeineController
     let openPalette: () -> Void
 
     @AppStorage("sidebar.collapsedWorkspaces") private var collapsedRaw = ""
@@ -111,6 +113,7 @@ struct SidebarView: View {
 
     private func row(_ item: DeckItem, workspace: Workspace?, shortcut: Int?) -> some View {
         SidebarRow(item: item, workspace: workspace, isSelected: deck.page == nil && deck.selectedID == item.id,
+                   effect: caffeine.snapshot.work(ofItem: item.id),
                    shortcut: shortcut, onSelect: { deck.select(item) }, onClose: { deck.close(item) },
                    onNewHere: {
                        var config = Ghostty.SurfaceConfiguration()
@@ -267,6 +270,8 @@ private struct SidebarRow: View {
     @ObservedObject var item: DeckItem
     let workspace: Workspace?
     let isSelected: Bool
+    /// What keeps this item awake under the café; nil when it is not under its effect.
+    let effect: ChatWork?
     /// 1…9: the ⌘ number that selects this item.
     let shortcut: Int?
     let onSelect: () -> Void
@@ -300,6 +305,7 @@ private struct SidebarRow: View {
         .padding(.trailing, 6)
         .frame(height: 44)
         .background(background)
+        .overlay { caffeineOutline }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onHover { hovered = $0 }
@@ -362,6 +368,8 @@ private struct SidebarRow: View {
             case .needsInput: Text("Esperando você").foregroundStyle(Theme.attention).fontWeight(.medium)
             case .finished: Text("Claude terminou").foregroundStyle(Theme.attention)
             }
+        } else if case .subagents(let n)? = effect, !item.claudeWorking {
+            Text(n == 1 ? "1 sub-agente" : "\(n) sub-agentes").foregroundStyle(Theme.claude)
         } else if item.claudeWorking {
             Text("Claude trabalhando…").foregroundStyle(Theme.claude)
         } else {
@@ -404,6 +412,18 @@ private struct SidebarRow: View {
         } else if item.attention != nil {
             Circle().fill(Theme.attention).frame(width: 8, height: 8)
                 .help("O Claude está esperando você")
+        } else if effect != nil {
+            Image(systemName: "cup.and.saucer.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .help("Mantido acordado pelo café")
+        }
+    }
+
+    /// Under the café: a thin outline in the workspace's color, breathing slowly.
+    @ViewBuilder private var caffeineOutline: some View {
+        if effect != nil {
+            CaffeineOutline(color: NSColor(color)).allowsHitTesting(false)
         }
     }
 
@@ -415,6 +435,81 @@ private struct SidebarRow: View {
             }
         } else if hovered {
             RoundedRectangle(cornerRadius: Theme.Radius.row).fill(Color.primary.opacity(0.05))
+        }
+    }
+}
+
+/// The café's outline around a sidebar row. The breathing is a Core Animation
+/// animation on the layer, run by the render server, for the same reason as
+/// ClaudeMark: SwiftUI's repeatForever re-renders the sidebar every frame.
+struct CaffeineOutline: NSViewRepresentable {
+    let color: NSColor
+
+    func makeNSView(context: Context) -> CaffeineOutlineView { CaffeineOutlineView() }
+
+    func updateNSView(_ view: CaffeineOutlineView, context: Context) { view.color = color }
+}
+
+final class CaffeineOutlineView: NSView {
+    private let outline = CAShapeLayer()
+    private static let breatheKey = "breathe"
+
+    var color: NSColor = .secondaryLabelColor {
+        didSet { if color != oldValue { applyColor() } }
+    }
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        outline.fillColor = nil
+        outline.lineWidth = 1
+        outline.opacity = 0.4
+        layer?.addSublayer(outline)
+        applyColor()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        outline.frame = bounds
+        // Inset by half the line, so the whole stroke stays inside the row.
+        outline.path = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+                              cornerWidth: Theme.Radius.row, cornerHeight: Theme.Radius.row, transform: nil)
+        CATransaction.commit()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColor()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateBreathing()
+    }
+
+    private func applyColor() {
+        effectiveAppearance.performAsCurrentDrawingAppearance { outline.strokeColor = color.cgColor }
+    }
+
+    /// Breathes only while on screen, and not at all with Reduce Motion.
+    private func updateBreathing() {
+        let breathes = window != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if breathes, outline.animation(forKey: Self.breatheKey) == nil {
+            let animation = CABasicAnimation(keyPath: "opacity")
+            animation.fromValue = 0.25
+            animation.toValue = 0.45
+            animation.duration = 3
+            animation.autoreverses = true
+            animation.repeatCount = .infinity
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            outline.add(animation, forKey: Self.breatheKey)
+        } else if !breathes {
+            outline.removeAnimation(forKey: Self.breatheKey)
         }
     }
 }

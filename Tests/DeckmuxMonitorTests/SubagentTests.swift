@@ -65,3 +65,20 @@ private let handbackResult = #"{"type":"user","message":{"role":"user","content"
         .write(to: file, atomically: true, encoding: .utf8)
     #expect(SubagentReader.isFinished(transcript: file))
 }
+
+/// Claude Code marks a finished agent in its meta file; the handback line can
+/// be longer than the tail read from the transcript.
+@Test func metaFinishedEndsTheAgentEvenWithAHugeLastLine() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try #"{"agentType":"general-purpose","description":"Ler","finished":true}"#
+        .write(to: dir.appendingPathComponent("agent-x.meta.json"), atomically: true, encoding: .utf8)
+    let huge = String(repeating: "a", count: SubagentReader.tailBytes + 4096)
+    let handback = #"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":""# + huge
+        + #""},{"type":"tool_use","id":"t","name":"SubagentHandback","input":{}}]}}"#
+    let result = #"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t"}]}}"#
+    try (handback + "\n" + result + "\n").write(to: dir.appendingPathComponent("agent-x.jsonl"), atomically: true, encoding: .utf8)
+    let agents = SubagentReader.read(folder: dir, now: Date())
+    #expect(agents.count == 1)
+    #expect(agents.first?.isFinished == true)
+}
