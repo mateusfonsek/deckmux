@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/mateusfonsek/deckmux/compare/v0.5.0...v0.5.1) (2026-11-16)
+
+
+### Correções
+
+* com o café ligado, fechar a tampa apaga a tela ([#21](https://github.com/mateusfonsek/deckmux/issues/21)) ([7ddb676](https://github.com/mateusfonsek/deckmux/commit/7ddb676410fcca4df66531f3df7fa15743d5c705))
+
 ## [0.5.0](https://github.com/mateusfonsek/deckmux/compare/v0.4.1...v0.5.0) (2026-11-12)
 
 
