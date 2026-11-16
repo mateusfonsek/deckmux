@@ -57,6 +57,7 @@ final class CaffeineController: ObservableObject {
     private var state = Caffeine()
     private let sleepGuard = SleepGuard()
     private let watcher = SubagentWatcher()
+    private let lid = LidWatcher()
     private var subagents: [UUID: [SubagentInfo]] = [:]
     private var timer: Timer?
     /// Terminals whose tab shows the cup.
@@ -119,9 +120,25 @@ final class CaffeineController: ObservableObject {
         let timer = Timer(timeInterval: Self.tick, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.update() }
         }
+        // The rails need no precision to the second: let macOS group this
+        // wake-up with others.
+        timer.tolerance = 1
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        // Sleep is blocked, so closing the lid no longer turns the screen off.
+        lid.start { Self.turnDisplayOff() }
         update()
+    }
+
+    /// `pmset displaysleepnow`: the screen goes dark and locks as usual; the chats keep running.
+    private static func turnDisplayOff() {
+        logger.info("Lid closed: turning the display off")
+        #if DEBUG
+        print("[cafe] lid closed: display off")
+        #endif
+        DispatchQueue.global(qos: .userInitiated).async {
+            SystemProcess.run("/usr/bin/pmset", ["displaysleepnow"])
+        }
     }
 
     private func engage(retrying: Bool) -> Bool {
@@ -176,6 +193,7 @@ final class CaffeineController: ObservableObject {
         timer?.invalidate()
         timer = nil
         watcher.stop()
+        lid.stop()
         subagents = [:]
         let restored = sleepGuard.release()
         publish()
