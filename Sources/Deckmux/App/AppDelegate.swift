@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // ("processes" also ticks Processos).
         let environment = ProcessInfo.processInfo.environment
         DebugCommands.start(window: window)
+        DebugCommands.monitor = monitor
         if let open = environment["DECKMUX_OPEN_TASK_MANAGER"] {
             TaskManagerWindowController.shared?.exposeForChecks()
             TaskManagerWindowController.shared?.show(includingProcesses: open == "processes")

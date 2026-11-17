@@ -48,3 +48,9 @@ private let kiro = KiroProvider()
     #expect(AgentRegistry.provider(for: .kiro).hookFile?.relativePath == ".kiro/hooks/deckmux.json")
     #expect(AgentRegistry.provider(for: .claude).hookFile == nil)
 }
+
+@Test func usageSourcesThroughTheRegistry() {
+    #expect(AgentRegistry.provider(for: .claude).usageSource == .claudeAccount)
+    #expect(AgentRegistry.provider(for: .codex).usageSource == .codexSessions)
+    #expect(AgentRegistry.provider(for: .kiro).usageSource == nil)
+}

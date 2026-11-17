@@ -15,6 +15,7 @@ public struct ClaudeProvider: AgentProvider {
     public let workSignal = AgentWorkSignal.terminalTitle
 
     public var mcp: (any AgentMcp)? { ClaudeMcp() }
+    public var usageSource: AgentUsageSource? { .claudeAccount }
 
     public func launchCommand() -> String { "claude\n" }
 

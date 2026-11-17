@@ -26,6 +26,8 @@ import UserNotifications
 @MainActor
 enum DebugCommands {
     private static var observer: NSObjectProtocol?
+    /// The Janelinha: `janelinha on|off` switches it (without saving), `snap` renders it.
+    static weak var monitor: MonitorPanelController?
 
     static func start(window: MainWindowController) {
         setvbuf(stdout, nil, _IOLBF, 0)   // the log file gets each line as it comes
@@ -115,6 +117,10 @@ enum DebugCommands {
             if parts.count > 1, let tab = WorkspacesModel.DetailTab.allCases.first(where: { "\($0)" == parts[1] }) {
                 window.workspacesModel.detailTab = tab
             }
+        case "janelinha": monitor?.setEnabled(rest == "on", preview: true)
+        case "usage":
+            if let kind = AgentKind(rawValue: rest) { AgentSettings.shared.usageAgent = kind }
+            print("[debug] usage agent: \(AgentSettings.shared.usageAgent?.rawValue ?? "-")")
         case "buttons":
             print("[debug] buttons: \(window.deck.selected?.layout.bonsplit.configuration.appearance.splitButtons.map(\.id) ?? [])")
         case "state":
@@ -142,6 +148,12 @@ enum DebugCommands {
                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
             view.cacheDisplay(in: view.bounds, to: rep)
             write(rep, to: dir.appendingPathComponent("window-\(index).png"))
+        }
+        if let monitor, monitor.isEnabled {
+            let janelinha = ImageRenderer(content: MonitorView(model: monitor.model, collapsed: false, onReveal: { _ in }, onToggleCollapse: {})
+                .background(Color(nsColor: .windowBackgroundColor)))
+            janelinha.scale = 2
+            if let image = janelinha.nsImage { write(image, to: dir.appendingPathComponent("janelinha.png")) }
         }
         let panel = ImageRenderer(content: CaffeinePanel(caffeine: window.caffeine) {}
             .background(Color(nsColor: .windowBackgroundColor)))

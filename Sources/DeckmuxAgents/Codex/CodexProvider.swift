@@ -16,6 +16,7 @@ public struct CodexProvider: AgentProvider {
     public let workSignal = AgentWorkSignal.hookTurns
 
     public var mcp: (any AgentMcp)? { CodexMcp() }
+    public var usageSource: AgentUsageSource? { .codexSessions }
 
     public func launchCommand() -> String { "codex\n" }
 

@@ -119,6 +119,17 @@ final class MonitorModel: ObservableObject {
         rebuild(sampling: false)
     }
 
+    /// Whose usage is shown, and the agents to choose from (the ones on).
+    @Published private(set) var usageAgent: AgentKind?
+    @Published private(set) var usageAgents: [AgentKind] = []
+    /// Set by the panel: the user picked another agent's usage.
+    var onChooseUsage: ((AgentKind) -> Void)?
+
+    func setUsageAgents(_ agents: [AgentKind], current: AgentKind?) {
+        if usageAgents != agents { usageAgents = agents }
+        if usageAgent != current { usageAgent = current }
+    }
+
     func setUsage(_ usage: Usage?, problem: String?) {
         self.usage = usage
         usageProblem = problem

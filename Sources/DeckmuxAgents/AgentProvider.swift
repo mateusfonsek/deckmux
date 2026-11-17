@@ -31,6 +31,12 @@ public protocol AgentProvider: Sendable {
     var hookFile: AgentHookFile? { get }
     /// How it keeps and reports a workspace's MCP servers.
     var mcp: (any AgentMcp)? { get }
+    /// Where its usage limits can be read; nil shows "Uso indisponível".
+    var usageSource: AgentUsageSource? { get }
+}
+
+extension AgentProvider {
+    public var usageSource: AgentUsageSource? { nil }
 }
 
 public enum Shell {

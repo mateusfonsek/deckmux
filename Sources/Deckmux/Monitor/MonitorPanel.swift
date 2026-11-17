@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import DeckmuxMonitor
+import DeckmuxAgents
 import SwiftUI
 
 /// The Janelinha's window: a non-activating floating panel in the
@@ -10,7 +11,9 @@ import SwiftUI
 final class MonitorPanelController: NSObject, NSWindowDelegate {
     let model: MonitorModel
     private let watcher = SubagentWatcher()
-    private let usage = UsageClient()
+    /// The usage of the agent chosen in the Janelinha (Claude by default).
+    private var usage: AgentUsageFeed?
+    private var settingsObserver: NSObjectProtocol?
     private let reveal: (UUID) -> Void
     private let panel: NSPanel
     private let background: MonitorBackgroundView
@@ -67,7 +70,11 @@ final class MonitorPanelController: NSObject, NSWindowDelegate {
                                        onToggleCollapse: { [weak self] in self?.toggleCollapsed() })
 
         watcher.onChange = { [weak self] id, agents in self?.model.setSubagents(agents, forTerminal: id) }
-        usage.onUpdate = { [weak self] usage, failure in self?.usageUpdated(usage, failure) }
+        model.onChooseUsage = { kind in AgentSettings.shared.usageAgent = kind }
+        settingsObserver = NotificationCenter.default.addObserver(forName: AgentSettings.didChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.usageAgentChanged() }
+        }
+        model.setUsageAgents(AgentSettings.shared.enabled, current: AgentSettings.shared.usageAgent)
         observers.append(model.$sessions.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] sessions in
             self?.sessionsChanged(sessions)
         })
@@ -87,7 +94,7 @@ final class MonitorPanelController: NSObject, NSWindowDelegate {
         isEnabled = enabled
         model.setEnabled(enabled)
         if enabled {
-            usage.start()
+            startUsage()
             if preview {
                 previewing = true
                 previewTimer?.invalidate()
@@ -100,7 +107,8 @@ final class MonitorPanelController: NSObject, NSWindowDelegate {
             }
             relayout()
         } else {
-            usage.stop()
+            usage?.stop()
+            usage = nil
             watcher.stop()
             previewTimer?.invalidate()
             previewing = false
@@ -181,17 +189,29 @@ final class MonitorPanelController: NSObject, NSWindowDelegate {
         if panel.isVisible { relayout() }
     }
 
-    private func usageUpdated(_ usage: Usage?, _ failure: UsageClient.Failure?) {
-        let problem: String?
-        switch failure {
-        case nil: problem = nil
-        case .noToken?, .unauthorized?: problem = "Uso: faça /login no Claude Code"
-        case .keychainDenied?: problem = "Uso: acesso ao Keychain negado"
-        case .malformed?: problem = "Uso indisponível"
-        case .network?, .rateLimited?:
-            if let usage { problem = "⚠ \(AgentStatusItem.ago(usage.fetchedAt, now: Date()))" } else { problem = "Uso indisponível" }
+    /// Only the chosen agent's feed runs, and only while the Janelinha is on.
+    private func startUsage() {
+        usage?.stop()
+        usage = nil
+        model.setUsage(nil, problem: nil)
+        guard let kind = AgentSettings.shared.usageAgent else {
+            model.setUsage(nil, problem: "Nenhuma IA ligada")
+            return
         }
-        model.setUsage(usage, problem: problem)
+        guard let feed = AgentUsageFeeds.make(for: kind) else {
+            model.setUsage(nil, problem: "Uso indisponível para o \(AgentRegistry.provider(for: kind).displayName)")
+            return
+        }
+        feed.onUpdate = { [weak self] usage, problem in self?.model.setUsage(usage, problem: problem) }
+        usage = feed
+        feed.start()
+    }
+
+    private func usageAgentChanged() {
+        let current = AgentSettings.shared.usageAgent
+        let changed = current != model.usageAgent
+        model.setUsageAgents(AgentSettings.shared.enabled, current: current)
+        if changed, isEnabled { startUsage() }
     }
 
     // MARK: Layout
