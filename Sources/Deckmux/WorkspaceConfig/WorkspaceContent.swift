@@ -1,29 +1,6 @@
 import AppKit
+import DeckmuxJSON
 import Foundation
-
-/// Edits one JSON file through `JSONValue`, keeping everything it does not
-/// change. A missing file starts as `{}`.
-enum JSONEdit {
-    static func edit(_ text: String?, _ change: (inout JSONValue) throws -> Void) throws -> String {
-        var value = try text.map { try JSONValue(parsing: $0) } ?? .object([])
-        try change(&value)
-        return value.formatted(trailingNewline: text?.hasSuffix("\n") ?? true)
-    }
-
-    /// Adds or removes names in a JSON array of strings at `path`, keeping
-    /// the order of the others. An array left empty is removed.
-    static func setNames(_ names: [String], present: Bool, at path: [String], in value: inout JSONValue) {
-        value.update(path) { current in
-            var items = current?.arrayValue ?? []
-            for name in names {
-                let exists = items.contains { $0.stringValue == name }
-                if present, !exists { items.append(.string(name)) }
-                if !present { items.removeAll { $0.stringValue == name } }
-            }
-            return items.isEmpty ? nil : .array(items)
-        }
-    }
-}
 
 /// The colors a workspace can take.
 enum WorkspacePalette {

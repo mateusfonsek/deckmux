@@ -1,4 +1,5 @@
 import Darwin
+import DeckmuxJSON
 import Foundation
 
 /// Builds the change set of every workspace operation. Nothing is

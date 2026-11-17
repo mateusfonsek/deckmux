@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import DeckmuxJSON
 import Foundation
 import Network
 

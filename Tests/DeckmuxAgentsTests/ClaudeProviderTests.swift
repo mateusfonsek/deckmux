@@ -36,6 +36,6 @@ private let claude = ClaudeProvider()
 }
 
 @Test func registryOrder() {
-    #expect(AgentRegistry.all.map(\.kind) == [.claude])
+    #expect(AgentRegistry.all.map(\.kind) == [.claude, .codex])
     #expect(AgentRegistry.provider(for: .claude).displayName == "Claude")
 }

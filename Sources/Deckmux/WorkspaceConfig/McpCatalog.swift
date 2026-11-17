@@ -1,3 +1,4 @@
+import DeckmuxJSON
 import Foundation
 
 /// The MCP servers Deckmux knows how to add. The server name is
