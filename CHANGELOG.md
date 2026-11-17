@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/mateusfonsek/deckmux/compare/v0.5.1...v0.6.0) (2026-11-17)
+
+
+### Novidades
+
+* suporte a Codex e Kiro CLI, com as IAs escolhidas nos Ajustes ([#23](https://github.com/mateusfonsek/deckmux/issues/23)) ([8bf45c5](https://github.com/mateusfonsek/deckmux/commit/8bf45c5a47a3a912105a806c3ffc15ebb05943c9))
+
 ## [0.5.1](https://github.com/mateusfonsek/deckmux/compare/v0.5.0...v0.5.1) (2026-11-16)
 
 
