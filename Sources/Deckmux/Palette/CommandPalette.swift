@@ -89,6 +89,20 @@ enum PaletteEntries {
         }
         entries.append(PaletteEntry(id: "new-terminal", section: .actions, title: "Novo terminal", subtitle: "Sem workspace",
                                     icon: "plus") { deck.addOutsideWorkspaces() })
+        for kind in AgentSettings.shared.enabled {
+            let provider = AgentRegistry.provider(for: kind)
+            entries.append(PaletteEntry(id: "new-agent-\(kind.rawValue)", section: .actions, title: "Novo terminal com \(provider.displayName)",
+                                        subtitle: TerminalLabel.folderName(deck.selected?.directory), icon: "sparkle",
+                                        color: NSColor(hex: provider.mark.colorHex).map(Color.init), keywords: "ia agente \(provider.executable)") {
+                if let item = deck.selected {
+                    item.layout.openAgent(kind, inPane: item.layout.bonsplit.focusedPaneId)
+                } else {
+                    var config = Ghostty.SurfaceConfiguration()
+                    config.initialInput = provider.launchCommand()
+                    AgentSetup.whenInstalled(kind) { deck.add(config: config) }
+                }
+            })
+        }
         for workspace in deck.workspaces.workspaces {
             entries.append(PaletteEntry(id: "new-terminal-\(workspace.id)", section: .actions, title: "Novo terminal em \(workspace.name)",
                                         icon: "plus", color: workspace.color, keywords: "abrir") { deck.add(in: workspace) })

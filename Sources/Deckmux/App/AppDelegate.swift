@@ -210,9 +210,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard let snapshot = SessionStore.loadPrevious(), mainWindow?.deck.restore(snapshot) == true else { NSSound.beep(); return }
     }
 
-    @MainActor @objc private func toggleResumeClaude(_ sender: NSMenuItem) {
-        SessionSettings.resumesClaudeSessions.toggle()
-        sender.state = SessionSettings.resumesClaudeSessions ? .on : .off
+    @MainActor @objc private func showSettings(_ sender: Any?) {
+        SettingsWindowController.shared.show()
     }
 
     @MainActor @objc private func showToday(_ sender: Any?) {
@@ -254,11 +253,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let aboutItem = appMenu.addItem(withTitle: "Sobre o Deckmux", action: #selector(showAbout(_:)), keyEquivalent: "")
         aboutItem.target = self
         appMenu.addItem(.separator())
+        let settingsItem = appMenu.addItem(withTitle: "Ajustes…", action: #selector(showSettings(_:)), keyEquivalent: ",")
+        settingsItem.target = self
+        appMenu.addItem(.separator())
         let rootItem = appMenu.addItem(withTitle: "Alterar pasta dos workspaces…", action: #selector(chooseWorkspaceRoot(_:)), keyEquivalent: "")
         rootItem.target = self
-        let resumeItem = appMenu.addItem(withTitle: "Retomar conversas do Claude ao reabrir", action: #selector(toggleResumeClaude(_:)), keyEquivalent: "")
-        resumeItem.target = self
-        resumeItem.state = SessionSettings.resumesClaudeSessions ? .on : .off
         let cafeRuleItem = appMenu.addItem(withTitle: "Remover permissão do café…", action: #selector(removeCaffeineRule(_:)), keyEquivalent: "")
         cafeRuleItem.target = self
         // The system-wide shortcut that shows Deckmux.

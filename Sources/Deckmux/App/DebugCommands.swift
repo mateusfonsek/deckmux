@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import DeckmuxAgents
 import SwiftUI
 import UserNotifications
 
@@ -11,6 +12,10 @@ import UserNotifications
 /// - `type <text>` / `enter` type into the selected item's focused terminal.
 /// - `appearance light|dark` switches the app's appearance.
 /// - `notes` prints the delivered notifications.
+/// - `settings` opens Ajustes; `enable <agent> on|off` turns an agent on or off
+///   as the Ajustes toggle does.
+/// - `button <id>` runs a tab-bar button's action in the selected item, as a
+///   click on it does (e.g. `button newAgent.claude`).
 /// - `state` prints each terminal's agent session, turn, working state and bell,
 ///   and each sidebar item's agent.
 /// - `snap <dir>` writes every visible window, the café panel and the menu bar
@@ -56,6 +61,19 @@ enum DebugCommands {
                 for note in notes { print("[debug] note \(note.request.identifier): \(note.request.content.body)") }
                 print("[debug] notes: \(notes.count)")
             }
+        case "settings": SettingsWindowController.shared.show()
+        case "enable":
+            let parts = rest.split(separator: " ").map(String.init)
+            if parts.count == 2, let kind = AgentKind(rawValue: parts[0]) {
+                AgentActivation.request(kind, on: parts[1] == "on", settings: .shared)
+            }
+            print("[debug] enabled: \(AgentSettings.shared.enabled.map(\.rawValue))")
+        case "button":
+            if let layout = window.deck.selected?.layout {
+                layout.splitTabBar(layout.bonsplit, didRequestCustomAction: rest, inPane: layout.bonsplit.focusedPaneId ?? layout.bonsplit.allPaneIds[0])
+            }
+        case "buttons":
+            print("[debug] buttons: \(window.deck.selected?.layout.bonsplit.configuration.appearance.splitButtons.map(\.id) ?? [])")
         case "state":
             for item in window.deck.items {
                 let layout = item.layout
