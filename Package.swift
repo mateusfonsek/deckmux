@@ -39,8 +39,11 @@ let package = Package(
         // The café: keeping the Mac awake until the chats finish (state, work rule, copy, system commands); Foundation only.
         .target(name: "DeckmuxCaffeine", dependencies: ["DeckmuxMonitor"], path: "Sources/DeckmuxCaffeine", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "DeckmuxCaffeineTests", dependencies: ["DeckmuxCaffeine", "DeckmuxMonitor"], path: "Tests/DeckmuxCaffeineTests"),
+        // The AI coding agents Deckmux works with: one provider per agent (launch, resume, hook events, config files).
+        .target(name: "DeckmuxAgents", path: "Sources/DeckmuxAgents", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "DeckmuxAgentsTests", dependencies: ["DeckmuxAgents"], path: "Tests/DeckmuxAgentsTests"),
         // `deckmux hook <event>` and `deckmux task …`, bundled as Contents/Resources/bin/deckmux.
-        .executableTarget(name: "DeckmuxCLI", dependencies: ["DeckmuxTasks"], path: "Sources/DeckmuxCLI",
+        .executableTarget(name: "DeckmuxCLI", dependencies: ["DeckmuxTasks", "DeckmuxAgents"], path: "Sources/DeckmuxCLI",
                           swiftSettings: [.swiftLanguageMode(.v5)]),
         .executableTarget(
             name: "Deckmux",
@@ -55,6 +58,7 @@ let package = Package(
                 "DeckmuxCalendar",
                 "DeckmuxShell",
                 "DeckmuxCaffeine",
+                "DeckmuxAgents",
                 .product(name: "Bonsplit", package: "Bonsplit"),
                 .product(name: "Highlightr", package: "Highlightr"),
             ],
