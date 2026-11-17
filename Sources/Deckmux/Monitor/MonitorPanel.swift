@@ -175,8 +175,7 @@ final class MonitorPanelController: NSObject, NSWindowDelegate {
 
     private func sessionsChanged(_ sessions: [MonitorSession]) {
         let watched = sessions.compactMap { session -> (terminal: UUID, cwd: String, sessionID: String)? in
-            // Only Claude Code keeps subagent transcripts Deckmux can read.
-            guard session.agent == .claude, let cwd = session.cwd else { return nil }
+            guard AgentRegistry.provider(for: session.agent).keepsSubagentTranscripts, let cwd = session.cwd else { return nil }
             return (session.id, cwd, session.sessionID)
         }
         if isEnabled { watcher.watch(watched) }

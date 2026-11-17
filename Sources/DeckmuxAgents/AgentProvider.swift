@@ -33,10 +33,14 @@ public protocol AgentProvider: Sendable {
     var mcp: (any AgentMcp)? { get }
     /// Where its usage limits can be read; nil shows "Uso indisponível".
     var usageSource: AgentUsageSource? { get }
+    /// Whether it writes subagent transcripts Deckmux can follow
+    /// (`~/.claude/projects/<folder>/<session>/subagents`).
+    var keepsSubagentTranscripts: Bool { get }
 }
 
 extension AgentProvider {
     public var usageSource: AgentUsageSource? { nil }
+    public var keepsSubagentTranscripts: Bool { false }
 }
 
 public enum Shell {

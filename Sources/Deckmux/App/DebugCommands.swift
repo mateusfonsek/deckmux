@@ -132,6 +132,7 @@ enum DebugCommands {
                 }
             }
             print("[debug] status: \(AgentStatus.current(in: window.deck).label)")
+            print("[debug] cafe chats: \(window.caffeine.debugWorkingChats)")
         default: print("[debug] unknown command")
         }
     }

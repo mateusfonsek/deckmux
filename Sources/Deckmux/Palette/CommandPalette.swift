@@ -57,7 +57,7 @@ enum PaletteEntries {
         }
         entries.append(PaletteEntry(id: "page-today", section: .pages, title: "Hoje", subtitle: "Agenda e tarefas",
                                     icon: "sun.max", shortcut: "⌘0", keywords: "home agenda inicio") { deck.show(.today) })
-        entries.append(PaletteEntry(id: "page-workspaces", section: .pages, title: "Workspaces", subtitle: "Nome, cor, CLAUDE.md e MCPs",
+        entries.append(PaletteEntry(id: "page-workspaces", section: .pages, title: "Workspaces", subtitle: "Nome, cor, contexto e MCPs",
                                     icon: "square.stack.3d.up", keywords: "configuracoes ajustes mcp") { deck.showWorkspacesTab() })
         entries.append(PaletteEntry(id: "page-settings", section: .pages, title: "Ajustes", subtitle: "IAs que você usa",
                                     icon: "gearshape", shortcut: "⌘,", keywords: "configuracoes preferencias settings ia codex kiro claude") { deck.showSettings() })

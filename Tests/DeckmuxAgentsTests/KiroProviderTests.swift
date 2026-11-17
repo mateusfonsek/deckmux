@@ -54,3 +54,9 @@ private let kiro = KiroProvider()
     #expect(AgentRegistry.provider(for: .codex).usageSource == .codexSessions)
     #expect(AgentRegistry.provider(for: .kiro).usageSource == nil)
 }
+
+@Test func onlyClaudeKeepsSubagentTranscripts() {
+    #expect(AgentRegistry.provider(for: .claude).keepsSubagentTranscripts)
+    #expect(!AgentRegistry.provider(for: .codex).keepsSubagentTranscripts)
+    #expect(!AgentRegistry.provider(for: .kiro).keepsSubagentTranscripts)
+}

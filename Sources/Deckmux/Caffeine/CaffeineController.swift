@@ -211,6 +211,11 @@ final class CaffeineController: ObservableObject {
     }
 
     /// The chats that count as working right now.
+    #if DEBUG
+    /// The chats the café would keep the Mac awake for, for automated checks.
+    var debugWorkingChats: [String] { chats().map { "\($0.name):\($0.work)" } }
+    #endif
+
     private func chats() -> [CaffeineChat] {
         let now = Date()
         var found: [CaffeineChat] = []
@@ -234,8 +239,7 @@ final class CaffeineController: ObservableObject {
     private func watchSubagents() {
         var sessions: [(terminal: UUID, cwd: String, sessionID: String)] = []
         for item in deck.items {
-            // Only Claude Code keeps subagent transcripts Deckmux can read.
-            for (id, session) in item.layout.agentSessions where session.agent == .claude {
+            for (id, session) in item.layout.agentSessions where AgentRegistry.provider(for: session.agent).keepsSubagentTranscripts {
                 guard let cwd = session.directory ?? item.layout.terminal(withID: id)?.pwd else { continue }
                 sessions.append((id, cwd, session.sessionID))
             }

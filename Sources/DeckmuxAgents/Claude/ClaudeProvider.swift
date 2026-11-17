@@ -16,6 +16,7 @@ public struct ClaudeProvider: AgentProvider {
 
     public var mcp: (any AgentMcp)? { ClaudeMcp() }
     public var usageSource: AgentUsageSource? { .claudeAccount }
+    public var keepsSubagentTranscripts: Bool { true }
 
     public func launchCommand() -> String { "claude\n" }
 
