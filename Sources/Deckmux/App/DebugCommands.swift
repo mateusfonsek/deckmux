@@ -92,6 +92,10 @@ enum DebugCommands {
             let root = URL(fileURLWithPath: rest)
             let changes = WorkspaceOperations.agentMcpChanges(root: root, adding: WorkspaceOperations.mcpServers(in: root), removing: [])
             window.settingsModel.review.propose(ChangeSet(title: "MCP sync", changes: changes))
+        case "context-migrate":
+            let root = URL(fileURLWithPath: rest)
+            print("[debug] context file: \(WorkspaceOperations.contextURL(root).lastPathComponent) migrate=\(WorkspaceOperations.needsContextMigration(root))")
+            window.settingsModel.review.propose(ChangeSet(title: "Context", changes: WorkspaceOperations.contextMigrationChanges(root)))
         case "mcp-check":
             let root = URL(fileURLWithPath: rest)
             Task { @MainActor in

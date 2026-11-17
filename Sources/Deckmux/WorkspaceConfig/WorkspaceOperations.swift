@@ -13,6 +13,39 @@ struct WorkspaceOperations {
 
     static func manifestURL(_ root: URL) -> URL { root.appendingPathComponent(WorkspaceManifest.fileName) }
     static func claudeMdURL(_ root: URL) -> URL { root.appendingPathComponent("CLAUDE.md") }
+    static func agentsMdURL(_ root: URL) -> URL { root.appendingPathComponent("AGENTS.md") }
+
+    /// The file holding the workspace's context: `CLAUDE.md` while only
+    /// Claude Code is on, or while a workspace with its own `CLAUDE.md` text
+    /// has not moved it to `AGENTS.md` yet; otherwise `AGENTS.md`.
+    static func contextURL(_ root: URL, enabled: [AgentKind] = AgentSettings.shared.enabled) -> URL {
+        guard AgentContextLayout.layout(enabled: enabled) == .shared else { return claudeMdURL(root) }
+        let claudeMd = try? String(contentsOf: claudeMdURL(root), encoding: .utf8)
+        if let claudeMd, !AgentContextMigration.isMigrated(claudeMd: claudeMd),
+           !claudeMd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return claudeMdURL(root) }
+        return agentsMdURL(root)
+    }
+
+    /// Whether the workspace still keeps its context in `CLAUDE.md` while an
+    /// agent that reads `AGENTS.md` is on.
+    static func needsContextMigration(_ root: URL, enabled: [AgentKind] = AgentSettings.shared.enabled) -> Bool {
+        AgentContextLayout.layout(enabled: enabled) == .shared && contextURL(root, enabled: enabled) == claudeMdURL(root)
+    }
+
+    /// Moves the `CLAUDE.md` text into `AGENTS.md` and leaves `CLAUDE.md` importing it.
+    static func contextMigrationChanges(_ root: URL) -> [FileChange] {
+        let claudeMd = try? String(contentsOf: claudeMdURL(root), encoding: .utf8)
+        let agentsMd = try? String(contentsOf: agentsMdURL(root), encoding: .utf8)
+        guard let plan = AgentContextMigration.plan(claudeMd: claudeMd, agentsMd: agentsMd) else { return [] }
+        var changes: [FileChange] = []
+        if let agents = plan.agents {
+            changes.append(FileChange(url: agentsMdURL(root), isGlobal: false, summary: "Contexto do workspace, lido por todas as IAs",
+                                      operation: .edit { _ in agents }))
+        }
+        changes.append(FileChange(url: claudeMdURL(root), isGlobal: false, summary: "O Claude Code passa a ler o AGENTS.md",
+                                  operation: .edit { _ in plan.claude }))
+        return changes
+    }
     static func mcpURL(_ root: URL) -> URL { root.appendingPathComponent(".mcp.json") }
     static func settingsURL(_ root: URL) -> URL { root.appendingPathComponent(".claude/settings.json") }
 
@@ -81,7 +114,7 @@ struct WorkspaceOperations {
 
         var changes: [FileChange] = [
             manifestChange(folder, summary: "Marca a pasta como workspace") { $0 = manifest },
-            FileChange(url: Self.claudeMdURL(folder), isGlobal: false, summary: "Contexto da \(new.name) para o Claude Code",
+            FileChange(url: Self.contextURL(folder), isGlobal: false, summary: "Contexto da \(new.name) para as IAs",
                        operation: .edit { current in current ?? Self.claudeMdTemplate(name: new.name, folder: folder) }),
             FileChange(url: Self.settingsURL(folder), isGlobal: false, summary: "Tema do Claude Code na raiz do workspace",
                        operation: .edit { current in
@@ -99,13 +132,17 @@ struct WorkspaceOperations {
                        }),
             themeChange(slug: slug, name: new.name, color: new.color),
         ]
+        if Self.contextURL(folder) == Self.agentsMdURL(folder) {
+            changes.append(FileChange(url: Self.claudeMdURL(folder), isGlobal: false, summary: "O Claude Code lê o AGENTS.md",
+                                      operation: .edit { current in current ?? AgentContextMigration.importLine + "\n" }))
+        }
         if !mcpNames.isEmpty { changes.append(approvalChange(mcpNames, approved: true)) }
         let servers = new.mcps.compactMap { McpServer(name: $0.serverName(slug: slug), claudeEntry: $0.entry(slug: slug, googleEmail: nil)) }
         if !servers.isEmpty { changes += Self.agentMcpChanges(root: folder, adding: servers, removing: []) }
         changes += googleSecretChanges(new.mcps, slug: slug)
         if new.computerUse { changes.append(computerUseChange(folder, enabled: true)) }
         let summary = WorkspaceSummary(name: new.name, slug: slug, color: new.color, mcpNames: mcpNames,
-                                       claudeSections: WorkspaceSummary.sections(of: try? String(contentsOf: Self.claudeMdURL(folder), encoding: .utf8)))
+                                       claudeSections: WorkspaceSummary.sections(of: try? String(contentsOf: Self.contextURL(folder), encoding: .utf8)))
         changes.append(guideChange(summaries(replacing: slug, with: summary)))
         return ChangeSet(title: "Criar o workspace \(new.name)", changes: changes)
     }
@@ -133,11 +170,13 @@ struct WorkspaceOperations {
         ])
     }
 
-    func saveClaudeMd(_ workspace: Workspace, text: String) -> ChangeSet {
+    /// Saves the context file (`CLAUDE.md` or `AGENTS.md`, see `contextURL`).
+    func saveContext(_ workspace: Workspace, text: String) -> ChangeSet {
         var summary = summaryOf(workspace)
         summary.claudeSections = WorkspaceSummary.sections(of: text)
-        return ChangeSet(title: "Salvar o CLAUDE.md de \(workspace.name)", changes: [
-            FileChange(url: Self.claudeMdURL(workspace.root), isGlobal: false, summary: "Contexto e regras do workspace",
+        let url = Self.contextURL(workspace.root)
+        return ChangeSet(title: "Salvar o \(url.lastPathComponent) de \(workspace.name)", changes: [
+            FileChange(url: url, isGlobal: false, summary: "Contexto e regras do workspace",
                        operation: .edit { _ in text }),
             guideChange(summaries(replacing: workspace.id, with: summary)),
         ])
@@ -211,6 +250,7 @@ struct WorkspaceOperations {
         var changes = [
             FileChange(url: Self.manifestURL(workspace.root), isGlobal: false, summary: "Manifesto", operation: .edit { _ in nil }),
             FileChange(url: Self.claudeMdURL(workspace.root), isGlobal: false, summary: "Contexto do workspace", operation: .edit { _ in nil }),
+            FileChange(url: Self.agentsMdURL(workspace.root), isGlobal: false, summary: "Contexto do workspace para as IAs", operation: .edit { _ in nil }),
             FileChange(url: Self.mcpURL(workspace.root), isGlobal: false, summary: "MCPs do workspace", operation: .edit { _ in nil }),
             FileChange(url: Self.settingsURL(workspace.root), isGlobal: false, summary: "Settings do Claude Code na raiz", operation: .edit { _ in nil }),
             FileChange(url: ConfigPaths.theme(slug: workspace.id), isGlobal: true, summary: "Tema custom:\(workspace.id)", operation: .edit { _ in nil }),
@@ -313,7 +353,7 @@ struct WorkspaceOperations {
             slug: workspace.id,
             color: workspace.manifest.color,
             mcpNames: Self.mcpNames(in: workspace.root),
-            claudeSections: WorkspaceSummary.sections(of: try? String(contentsOf: Self.claudeMdURL(workspace.root), encoding: .utf8))
+            claudeSections: WorkspaceSummary.sections(of: try? String(contentsOf: Self.contextURL(workspace.root), encoding: .utf8))
         )
     }
 

@@ -32,6 +32,12 @@ enum AgentActivation {
         let provider = AgentRegistry.provider(for: kind)
         var changes: [FileChange] = []
         if let change = hookChange(kind, install: true) { changes.append(change) }
+        // Agents other than Claude read AGENTS.md: offer to move each
+        // workspace's CLAUDE.md text there (the review shows it; never automatic).
+        let after = Array(Set(AgentSettings.shared.enabled + [kind]))
+        for workspace in workspaces where WorkspaceOperations.needsContextMigration(workspace.root, enabled: after) {
+            changes += WorkspaceOperations.contextMigrationChanges(workspace.root)
+        }
         // The workspaces' MCP servers, in the agent's own file.
         for workspace in workspaces {
             let servers = WorkspaceOperations.mcpServers(in: workspace.root)

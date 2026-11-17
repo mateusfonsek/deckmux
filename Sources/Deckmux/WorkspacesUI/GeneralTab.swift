@@ -1,3 +1,4 @@
+import DeckmuxAgents
 import AppKit
 import SwiftUI
 
@@ -64,6 +65,7 @@ struct GeneralTab: View {
                         }
                     }
 
+                    if AgentSettings.shared.isEnabled(.claude) {
                     SettingsCard(title: "Claude Code") {
                         Toggle(isOn: Binding(
                             get: { workspace.manifest.computerUse ?? false },
@@ -76,6 +78,7 @@ struct GeneralTab: View {
                             }
                         }
                         .toggleStyle(.switch)
+                    }
                     }
 
                     SettingsCard(title: "Remover", subtitle: "Tirar da lista apaga só o .workspace.json. Apagar de vez também apaga a configuração (CLAUDE.md, MCPs, tema, credenciais do Google). A pasta e os repositórios nunca são apagados.", tint: .red) {

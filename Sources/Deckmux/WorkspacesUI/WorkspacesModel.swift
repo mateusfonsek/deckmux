@@ -20,7 +20,7 @@ final class WorkspacesModel: ObservableObject {
     @Published var showsNewWorkspace = false
 
     enum DetailTab: String, CaseIterable, Identifiable {
-        case general = "Geral", claude = "CLAUDE.md", mcps = "MCPs"
+        case general = "Geral", context = "Contexto", mcps = "MCPs"
         var id: String { rawValue }
     }
 

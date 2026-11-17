@@ -123,7 +123,7 @@ private struct WorkspaceDetail: View {
             Divider().opacity(0.6)
             switch model.detailTab {
             case .general: GeneralTab(model: model, workspace: workspace)
-            case .claude: ClaudeMdTab(model: model, workspace: workspace)
+            case .context: ContextTab(model: model, workspace: workspace)
             case .mcps: McpTab(model: model, workspace: workspace)
             }
         }
