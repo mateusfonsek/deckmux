@@ -6,6 +6,7 @@ public enum AgentRegistry {
     public static let all: [any AgentProvider] = [
         ClaudeProvider(),
         CodexProvider(),
+        KiroProvider(),
     ]
 
     public static func provider(for kind: AgentKind) -> any AgentProvider {

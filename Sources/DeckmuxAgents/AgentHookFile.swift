@@ -82,8 +82,19 @@ public struct AgentHookFile: Sendable {
         return json.formatted(trailingNewline: current?.hasSuffix("\n") ?? true)
     }
 
+    /// The whole file is Deckmux's: written on install, deleted on removal.
     private func editedKiro(_ current: String?, install: Bool, agent: AgentKind) throws -> String? {
-        preconditionFailure("Kiro hooks come with the Kiro provider")
+        guard install else { return nil }
+        let hooks: [JSONValue] = events.map { event in
+            .object([
+                ("name", .string("deckmux-\(event.deckmux)")),
+                ("trigger", .string(event.native)),
+                ("action", .object([("type", .string("command")), ("command", .string(Self.command(agent: agent, event: event.deckmux)))])),
+                ("timeout", .number("5")),
+                ("enabled", .bool(true)),
+            ])
+        }
+        return JSONValue.object([("version", .string("v1")), ("hooks", .array(hooks))]).formatted()
     }
 }
 

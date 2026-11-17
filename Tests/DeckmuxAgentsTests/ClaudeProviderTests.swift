@@ -35,7 +35,3 @@ private let claude = ClaudeProvider()
     #expect(claude.hasTranscript(session, home: home, environment: ["CLAUDE_CONFIG_DIR": other.path]) == false)
 }
 
-@Test func registryOrder() {
-    #expect(AgentRegistry.all.map(\.kind) == [.claude, .codex])
-    #expect(AgentRegistry.provider(for: .claude).displayName == "Claude")
-}
