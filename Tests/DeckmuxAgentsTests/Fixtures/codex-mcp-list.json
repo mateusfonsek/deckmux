@@ -1,0 +1,29 @@
+[
+  {
+    "name": "custom-acme",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": { "type": "stdio", "command": "uvx", "args": ["mcp-server-time"], "env": {"A": "1"}, "env_vars": [], "cwd": null },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  },
+  {
+    "name": "slack-acme",
+    "enabled": true,
+    "disabled_reason": null,
+    "transport": { "type": "streamable_http", "url": "https://mcp.slack.com/mcp", "bearer_token_env_var": null, "http_headers": null, "env_http_headers": null },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "not_logged_in"
+  },
+  {
+    "name": "off-acme",
+    "enabled": false,
+    "disabled_reason": "disabled in config",
+    "transport": { "type": "stdio", "command": "x", "args": [], "env": null, "env_vars": [], "cwd": null },
+    "startup_timeout_sec": null,
+    "tool_timeout_sec": null,
+    "auth_status": "unsupported"
+  }
+]

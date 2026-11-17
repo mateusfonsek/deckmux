@@ -14,6 +14,8 @@ public struct KiroProvider: AgentProvider {
     public let mark = AgentMark(glyph: "\u{25C6}\u{FE0E}", colorHex: "#9046FF", scale: 1.0)
     public let workSignal = AgentWorkSignal.hookTurns
 
+    public var mcp: (any AgentMcp)? { KiroMcp() }
+
     public func launchCommand() -> String { "kiro-cli\n" }
 
     public func resumeCommand(sessionID: String) -> String { "kiro-cli chat --resume-id \(Shell.quoted(sessionID))\n" }

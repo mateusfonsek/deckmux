@@ -1,3 +1,4 @@
+import DeckmuxAgents
 import DeckmuxJSON
 import DeckmuxShell
 import Foundation
@@ -76,55 +77,34 @@ enum UserShell {
         }
     }
 
-    /// The `claude` executable on the user's PATH (never Deckmux's wrapper).
-    static func claudeExecutable(path: String) -> String? {
-        Executables.find("claude", inPath: path, skipping: AgentIntegration.binDirectory?.path)
+    /// An executable on the user's PATH (never Deckmux's `claude` wrapper).
+    static func executable(_ name: String, path: String) -> String? {
+        Executables.find(name, inPath: path, skipping: AgentIntegration.binDirectory?.path)
     }
-}
-
-/// The health of one MCP server, as `claude mcp list` reports it.
-enum McpHealth: Equatable {
-    case checking
-    case connected
-    case needsLogin
-    case failed(String)
-    /// Not listed (Claude Code ignores servers it has not been asked to approve).
-    case unknown
 }
 
 enum McpStatusChecker {
-    /// Runs `claude mcp list` in the workspace root, where its `.mcp.json`
-    /// applies, and returns the health of each server by name.
-    static func check(root: URL) async -> Result<[String: McpHealth], ApplyError> {
+    /// Runs each agent's MCP list command in the workspace root, where its
+    /// files apply, and returns each server's health by agent.
+    static func check(root: URL, agents: [AgentKind]) async -> [AgentKind: Result<[String: McpHealth], ApplyError>] {
         let path = await UserShell.path()
-        guard let claude = UserShell.claudeExecutable(path: path) else {
-            return .failure(ApplyError(message: AgentSetup.missingMessage(.claude)))
-        }
-        let output = await UserShell.run(claude, ["mcp", "list"], in: root, path: path)
-        guard output.status == 0 || !output.stdout.isEmpty else {
-            return .failure(ApplyError(message: output.stderr.isEmpty ? "claude mcp list falhou." : output.stderr))
-        }
-        return .success(parse(output.stdout))
-    }
-
-    /// Lines look like `slack-acme: https://mcp.slack.com/mcp (HTTP) - ✔ Connected`.
-    static func parse(_ text: String) -> [String: McpHealth] {
-        var result: [String: McpHealth] = [:]
-        for line in text.split(separator: "\n").map(String.init) {
-            guard let colon = line.firstIndex(of: ":"), let dash = line.range(of: " - ", options: .backwards) else { continue }
-            let name = String(line[..<colon])
-            guard !name.contains(" ") else { continue }
-            let status = line[dash.upperBound...].trimmingCharacters(in: .whitespaces)
-            if status.contains("Connected") {
-                result[name] = .connected
-            } else if status.localizedCaseInsensitiveContains("auth") {
-                result[name] = .needsLogin
+        var results: [AgentKind: Result<[String: McpHealth], ApplyError>] = [:]
+        for kind in agents {
+            let provider = AgentRegistry.provider(for: kind)
+            guard let mcp = provider.mcp else { continue }
+            guard let executable = UserShell.executable(provider.executable, path: path) else {
+                results[kind] = .failure(ApplyError(message: AgentSetup.missingMessage(kind)))
+                continue
+            }
+            let output = await UserShell.run(executable, mcp.listArguments, in: root, path: path)
+            if output.status != 0 && output.stdout.isEmpty && mcp.health(stdout: "", stderr: output.stderr).isEmpty {
+                let command = ([provider.executable] + mcp.listArguments).joined(separator: " ")
+                results[kind] = .failure(ApplyError(message: output.stderr.isEmpty ? "\(command) falhou." : output.stderr))
             } else {
-                let message = status.replacingOccurrences(of: "✗", with: "").trimmingCharacters(in: .whitespaces)
-                result[name] = .failed(message)
+                results[kind] = .success(mcp.health(stdout: output.stdout, stderr: output.stderr))
             }
         }
-        return result
+        return results
     }
 }
 

@@ -32,6 +32,12 @@ enum AgentActivation {
         let provider = AgentRegistry.provider(for: kind)
         var changes: [FileChange] = []
         if let change = hookChange(kind, install: true) { changes.append(change) }
+        // The workspaces' MCP servers, in the agent's own file.
+        for workspace in workspaces {
+            let servers = WorkspaceOperations.mcpServers(in: workspace.root)
+            guard !servers.isEmpty else { continue }
+            changes += WorkspaceOperations.agentMcpChanges(root: workspace.root, adding: servers, removing: [], agents: [kind])
+        }
         return ChangeSet(title: "Ligar o \(provider.displayName)", changes: changes)
     }
 

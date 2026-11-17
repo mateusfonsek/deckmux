@@ -43,7 +43,8 @@ let package = Package(
         .target(name: "DeckmuxJSON", path: "Sources/DeckmuxJSON", swiftSettings: [.swiftLanguageMode(.v5)]),
         // The AI coding agents Deckmux works with: one provider per agent (launch, resume, hook events, config files).
         .target(name: "DeckmuxAgents", dependencies: ["DeckmuxJSON"], path: "Sources/DeckmuxAgents", swiftSettings: [.swiftLanguageMode(.v5)]),
-        .testTarget(name: "DeckmuxAgentsTests", dependencies: ["DeckmuxAgents", "DeckmuxJSON"], path: "Tests/DeckmuxAgentsTests"),
+        .testTarget(name: "DeckmuxAgentsTests", dependencies: ["DeckmuxAgents", "DeckmuxJSON"], path: "Tests/DeckmuxAgentsTests",
+                    resources: [.copy("Fixtures")]),
         // `deckmux hook <event>` and `deckmux task …`, bundled as Contents/Resources/bin/deckmux.
         .executableTarget(name: "DeckmuxCLI", dependencies: ["DeckmuxTasks", "DeckmuxAgents"], path: "Sources/DeckmuxCLI",
                           swiftSettings: [.swiftLanguageMode(.v5)]),

@@ -16,6 +16,9 @@ import UserNotifications
 ///   as the Ajustes toggle does.
 /// - `button <id>` runs a tab-bar button's action in the selected item, as a
 ///   click on it does (e.g. `button newAgent.claude`).
+/// - `mcp-sync <folder>` reviews writing <folder>'s `.mcp.json` servers into
+///   the enabled agents' files (apply with `review apply`); `mcp-check <folder>`
+///   prints each enabled agent's health for them.
 /// - `state` prints each terminal's agent session, turn, working state and bell,
 ///   and each sidebar item's agent.
 /// - `snap <dir>` writes every visible window, the café panel and the menu bar
@@ -84,6 +87,29 @@ enum DebugCommands {
                 if rest == "apply" { model.apply(pending) }
             } else {
                 print("[debug] review: none")
+            }
+        case "mcp-sync":
+            let root = URL(fileURLWithPath: rest)
+            let changes = WorkspaceOperations.agentMcpChanges(root: root, adding: WorkspaceOperations.mcpServers(in: root), removing: [])
+            window.settingsModel.review.propose(ChangeSet(title: "MCP sync", changes: changes))
+        case "mcp-check":
+            let root = URL(fileURLWithPath: rest)
+            Task { @MainActor in
+                let results = await McpStatusChecker.check(root: root, agents: AgentSettings.shared.enabled)
+                for (kind, result) in results.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+                    switch result {
+                    case .success(let health): print("[debug] mcp \(kind.rawValue): \(health.sorted { $0.key < $1.key })")
+                    case .failure(let error): print("[debug] mcp \(kind.rawValue) failed: \(error.message)")
+                    }
+                }
+            }
+        case "workspace":
+            // `workspace <slug> <tab>`: shows the Workspaces screen on that workspace's tab (geral, claude, mcps).
+            let parts = rest.split(separator: " ").map(String.init)
+            window.deck.showWorkspacesTab()
+            if let slug = parts.first { window.workspacesModel.selectedSlug = slug }
+            if parts.count > 1, let tab = WorkspacesModel.DetailTab.allCases.first(where: { "\($0)" == parts[1] }) {
+                window.workspacesModel.detailTab = tab
             }
         case "buttons":
             print("[debug] buttons: \(window.deck.selected?.layout.bonsplit.configuration.appearance.splitButtons.map(\.id) ?? [])")

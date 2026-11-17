@@ -15,6 +15,8 @@ public struct CodexProvider: AgentProvider {
     public let mark = AgentMark(glyph: "\u{2B21}\u{FE0E}", colorHex: "#10A37F", scale: 1.5, relativeSize: 1.35)
     public let workSignal = AgentWorkSignal.hookTurns
 
+    public var mcp: (any AgentMcp)? { CodexMcp() }
+
     public func launchCommand() -> String { "codex\n" }
 
     public func resumeCommand(sessionID: String) -> String { "codex resume \(Shell.quoted(sessionID))\n" }

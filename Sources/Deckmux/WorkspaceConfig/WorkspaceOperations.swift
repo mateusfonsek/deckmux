@@ -1,5 +1,6 @@
 import Darwin
 import DeckmuxJSON
+import DeckmuxAgents
 import Foundation
 
 /// Builds the change set of every workspace operation. Nothing is
@@ -20,6 +21,25 @@ struct WorkspaceOperations {
         guard let text = try? String(contentsOf: mcpURL(root), encoding: .utf8),
               let json = try? JSONValue(parsing: text) else { return [] }
         return json["mcpServers"]?.objectMembers?.map(\.key) ?? []
+    }
+
+    /// The workspace's servers from `.mcp.json`, as every agent sees them.
+    static func mcpServers(in root: URL) -> [McpServer] {
+        mcpNames(in: root).compactMap { name in mcpEntry(name, in: root).flatMap { McpServer(name: name, claudeEntry: $0) } }
+    }
+
+    /// The same change in the MCP files of the other agents turned on
+    /// (`.codex/config.toml`, `.kiro/settings/mcp.json`); `.mcp.json` is the list.
+    static func agentMcpChanges(root: URL, adding: [McpServer], removing: [String],
+                                agents: [AgentKind] = AgentSettings.shared.enabled) -> [FileChange] {
+        agents.compactMap { kind -> FileChange? in
+            let provider = AgentRegistry.provider(for: kind)
+            guard let mcp = provider.mcp, let path = mcp.relativePath else { return nil }
+            let what = (adding.map { "adiciona \($0.name)" } + removing.map { "remove \($0)" }).joined(separator: ", ")
+            return FileChange(url: root.appendingPathComponent(path), isGlobal: false,
+                              summary: "MCPs para o \(provider.displayName)" + (what.isEmpty ? "" : ": \(what)"),
+                              operation: .edit { current in try mcp.edited(current, adding: adding, removing: removing) })
+        }
     }
 
     static func mcpEntry(_ name: String, in root: URL) -> JSONValue? {
@@ -80,6 +100,8 @@ struct WorkspaceOperations {
             themeChange(slug: slug, name: new.name, color: new.color),
         ]
         if !mcpNames.isEmpty { changes.append(approvalChange(mcpNames, approved: true)) }
+        let servers = new.mcps.compactMap { McpServer(name: $0.serverName(slug: slug), claudeEntry: $0.entry(slug: slug, googleEmail: nil)) }
+        if !servers.isEmpty { changes += Self.agentMcpChanges(root: folder, adding: servers, removing: []) }
         changes += googleSecretChanges(new.mcps, slug: slug)
         if new.computerUse { changes.append(computerUseChange(folder, enabled: true)) }
         let summary = WorkspaceSummary(name: new.name, slug: slug, color: new.color, mcpNames: mcpNames,
@@ -136,6 +158,9 @@ struct WorkspaceOperations {
                        }),
             approvalChange([name], approved: true),
         ]
+        if let server = McpServer(name: name, claudeEntry: spec.entry(slug: workspace.id, googleEmail: workspace.manifest.google?.email)) {
+            changes += Self.agentMcpChanges(root: workspace.root, adding: [server], removing: [])
+        }
         if spec.kind == .google {
             changes.append(manifestChange(workspace.root, summary: "Porta do login do Google: \(spec.googlePort)") { manifest in
                 manifest.google = .init(email: manifest.google?.email, port: spec.googlePort)
@@ -156,6 +181,7 @@ struct WorkspaceOperations {
                        }),
             approvalChange([name], approved: false),
         ]
+        changes += Self.agentMcpChanges(root: workspace.root, adding: [], removing: [name])
         if McpKind.of(serverName: name) == .google {
             changes.append(manifestChange(workspace.root, summary: "Sem conta Google") { manifest in
                 manifest.google = nil
@@ -194,6 +220,10 @@ struct WorkspaceOperations {
             guideChange(summaries(replacing: workspace.id, with: nil)),
         ]
         if !names.isEmpty { changes.insert(approvalChange(names, approved: false), at: 5) }
+        // Every agent's file, on or off: only the workspace's servers come out.
+        if !names.isEmpty {
+            changes += Self.agentMcpChanges(root: workspace.root, adding: [], removing: names, agents: AgentKind.allCases)
+        }
         return ChangeSet(title: "Apagar a configuração de \(workspace.name)", changes: changes)
     }
 

@@ -29,6 +29,8 @@ public protocol AgentProvider: Sendable {
 
     /// The hooks file Deckmux installs when the agent is turned on.
     var hookFile: AgentHookFile? { get }
+    /// How it keeps and reports a workspace's MCP servers.
+    var mcp: (any AgentMcp)? { get }
 }
 
 public enum Shell {

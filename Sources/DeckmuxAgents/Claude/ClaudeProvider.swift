@@ -14,6 +14,8 @@ public struct ClaudeProvider: AgentProvider {
     public let mark = AgentMark(glyph: "\u{2733}\u{FE0E}", colorHex: "#D97757", scale: 1.2)
     public let workSignal = AgentWorkSignal.terminalTitle
 
+    public var mcp: (any AgentMcp)? { ClaudeMcp() }
+
     public func launchCommand() -> String { "claude\n" }
 
     public func resumeCommand(sessionID: String) -> String { "claude --resume \(Shell.quoted(sessionID))\n" }

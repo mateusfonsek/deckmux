@@ -1,0 +1,15 @@
+
+🤖 default:
+
+  kiro_default
+    • custom-acme  uvx
+    • slack-acme   
+
+📄 workspace:
+
+  kiro_help
+    (empty)
+  kiro_planner
+    (empty)
+
+
