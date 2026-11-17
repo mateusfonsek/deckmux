@@ -1,12 +1,14 @@
 // deckmux: the command-line side of Deckmux, run inside its terminals.
 //
-//   deckmux hook <event>   Forwards a Claude Code hook (its JSON on stdin) to
-//                          the Deckmux app over its Unix socket.
+//   deckmux hook <agent> <event>   Forwards an agent's hook (its JSON on stdin)
+//                                  to the Deckmux app over its Unix socket.
+//                                  `deckmux hook <event>` alone means Claude.
 //   deckmux task …         The task board of the Hoje screen (see TaskCommand.swift).
 //
-// Hooks must never slow Claude Code down or break it: every failure is silent
+// Hooks must never slow the agent down or break it: every failure is silent
 // and the command always exits 0 without printing anything.
 import Darwin
+import DeckmuxAgents
 import Foundation
 
 let arguments = CommandLine.arguments.dropFirst()
@@ -15,8 +17,8 @@ if arguments.first == "task" {
     exit(TaskCommand.run(Array(arguments.dropFirst())))
 }
 
-guard arguments.first == "hook", let event = arguments.dropFirst().first else {
-    FileHandle.standardError.write(Data("usage: deckmux hook <event> | deckmux task --help\n".utf8))
+guard arguments.first == "hook", let (agent, event) = HookArguments.parse(Array(arguments.dropFirst())) else {
+    FileHandle.standardError.write(Data("usage: deckmux hook <agent> <event> | deckmux task --help\n".utf8))
     exit(arguments.isEmpty ? 0 : 2)
 }
 
@@ -27,7 +29,7 @@ guard let surface = environment["DECKMUX_SURFACE_ID"], !surface.isEmpty,
       let socketPath = environment["DECKMUX_SOCKET_PATH"], !socketPath.isEmpty else { exit(0) }
 
 let payload = (try? JSONSerialization.jsonObject(with: stdinData)) as? [String: Any] ?? [:]
-let message: [String: Any] = ["event": event, "surface": surface, "payload": payload]
+let message: [String: Any] = ["agent": agent.rawValue, "event": event, "surface": surface, "payload": payload]
 guard let body = try? JSONSerialization.data(withJSONObject: message) else { exit(0) }
 
 let fd = socket(AF_UNIX, SOCK_STREAM, 0)

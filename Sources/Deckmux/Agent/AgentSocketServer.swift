@@ -1,13 +1,31 @@
 import Darwin
+import DeckmuxAgents
 import Foundation
 import OSLog
 
 /// A message from `deckmux hook <event>`: which terminal it came from and the
 /// JSON Claude Code gave the hook on stdin.
 struct AgentHookMessage: Decodable {
+    /// Absent in messages from earlier `deckmux` CLIs, which only Claude sent.
+    let agent: AgentKind
     let event: String
     let surface: String
     let payload: [String: HookValue]
+
+    private enum CodingKeys: String, CodingKey { case agent, event, surface, payload }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        agent = try container.decodeIfPresent(AgentKind.self, forKey: .agent) ?? .claude
+        event = try container.decode(String.self, forKey: .event)
+        surface = try container.decode(String.self, forKey: .surface)
+        payload = try container.decode([String: HookValue].self, forKey: .payload)
+    }
+
+    /// The payload's string values, as providers read them.
+    var stringPayload: [String: String] {
+        payload.compactMapValues { if case .string(let value) = $0 { return value } else { return nil } }
+    }
 
     var terminalID: UUID? { UUID(uuidString: surface) }
 

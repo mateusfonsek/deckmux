@@ -62,7 +62,7 @@ for arg in "$@"; do
 done
 
 hook() {
-    printf '"%s":[{"hooks":[{"type":"command","command":"\\"$DECKMUX_CLI\\" hook %s","timeout":5}]}]' "$1" "$2"
+    printf '"%s":[{"hooks":[{"type":"command","command":"\\"$DECKMUX_CLI\\" hook claude %s","timeout":5}]}]' "$1" "$2"
 }
 settings="{\"hooks\":{$(hook SessionStart session-start),$(hook SessionEnd session-end),$(hook Stop stop),$(hook Notification notification),$(hook PermissionRequest permission-request)}}"
 
