@@ -42,6 +42,9 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     /// Terminals whose agent has a turn open (agents that report work through
     /// hooks: a prompt opens it, Stop closes it).
     @Published private(set) var agentTurns: Set<UUID> = []
+    /// When each open turn last showed life (prompt or tool use).
+    private var turnActivity: [UUID: Date] = [:]
+    private var turnSweep: Timer?
     /// Terminals whose agent is waiting for the user, by terminal ID.
     @Published private(set) var attention: [UUID: AgentAttention] = [:]
     /// When each bell in `attention` rang (the menu bar says "há 2 min").
@@ -55,6 +58,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
 
     deinit {
         configObserver.map(NotificationCenter.default.removeObserver)
+        turnSweep?.invalidate()
         commandObserver.map(NotificationCenter.default.removeObserver)
         settingsObserver.map(NotificationCenter.default.removeObserver)
     }
@@ -105,8 +109,10 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
             MainActor.assumeIsolated { self?.agentSettingsDidChange() }
         }
         commandObserver = NotificationCenter.default.addObserver(forName: .deckmuxCommandFinished, object: nil, queue: .main) { [weak self] note in
-            guard let self, let surface = note.object as? Ghostty.SurfaceView, self.contains(surface) else { return }
-            self.commandFinished(in: surface)
+            MainActor.assumeIsolated {
+                guard let self, let surface = note.object as? Ghostty.SurfaceView, self.contains(surface) else { return }
+                self.commandFinished(in: surface)
+            }
         }
         // Bonsplit seeds a "Welcome" tab; replace it with the first terminal,
         // or use it as a placeholder while a saved layout is rebuilt.
@@ -406,8 +412,36 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     }
 
     func setTurn(_ open: Bool, forTerminal id: UUID) {
+        if open { turnActivity[id] = Date() } else { turnActivity[id] = nil }
         guard agentTurns.contains(id) != open else { return }
         if open { agentTurns.insert(id) } else { agentTurns.remove(id) }
+        updateTurnSweep()
+    }
+
+    /// The agent used a tool: its turn is alive.
+    func touchTurn(forTerminal id: UUID) {
+        guard agentTurns.contains(id) else { return }
+        turnActivity[id] = Date()
+    }
+
+    /// While some turn is open, closes the ones gone quiet for longer than
+    /// `TurnRule.staleTurn` (an interrupt that sent no Stop).
+    private func updateTurnSweep() {
+        if agentTurns.isEmpty {
+            turnSweep?.invalidate()
+            turnSweep = nil
+        } else if turnSweep == nil {
+            turnSweep = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.closeStaleTurns() }
+            }
+        }
+    }
+
+    private func closeStaleTurns() {
+        let now = Date()
+        for id in agentTurns where !TurnRule.isWorking(turnOpen: true, lastActivity: turnActivity[id], now: now) {
+            setTurn(false, forTerminal: id)
+        }
     }
 
     /// The shell got its prompt back: an agent that reports work through
@@ -648,7 +682,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         }
         if let surface = surfaces.removeValue(forKey: tab) {
             agentSessions.removeValue(forKey: surface.id)
-            agentTurns.remove(surface.id)
+            setTurn(false, forTerminal: surface.id)
             attention.removeValue(forKey: surface.id)
             attentionSince.removeValue(forKey: surface.id)
         }

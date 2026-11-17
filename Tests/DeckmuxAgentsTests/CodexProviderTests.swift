@@ -38,5 +38,5 @@ private let codex = CodexProvider()
     let file = codex.hookFile
     #expect(file?.relativePath == ".codex/hooks.json")
     #expect(file?.format == .claudeStyle)
-    #expect(file?.events.map(\.native) == ["SessionStart", "UserPromptSubmit", "Stop", "PermissionRequest", "SessionEnd"])
+    #expect(file?.events.map(\.native) == ["SessionStart", "UserPromptSubmit", "Stop", "PermissionRequest", "PostToolUse", "SessionEnd"])
 }

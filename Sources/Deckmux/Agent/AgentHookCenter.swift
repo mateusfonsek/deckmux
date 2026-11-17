@@ -42,6 +42,9 @@ final class AgentHookCenter {
               let id = message.terminalID,
               let item = deck.item(withTerminal: id) else { return }
         let layout = item.layout
+        // Agents turned off in Ajustes are not followed, even if their hooks
+        // still fire (the Claude wrapper always adds them; a hooks file kept).
+        guard AgentSettings.shared.isEnabled(message.agent) else { return }
         let payload = message.stringPayload
         // Claude Code's permission Notification repeats its PermissionRequest.
         if message.agent == .claude, message.event == "notification", payload["notification_type"] == "permission_prompt",
@@ -57,14 +60,23 @@ final class AgentHookCenter {
             layout.setAgentSession(nil, forTerminal: id)
             clearAttention(terminal: id)
         case .turnStarted:
+            // A prompt without a session (Deckmux started after the agent) opens nothing.
+            guard layout.agentSessions[id] != nil else { return }
             layout.setTurn(true, forTerminal: id)
             clearAttention(terminal: id)
+        case .activity:
+            guard layout.agentSessions[id] != nil else { return }
+            layout.touchTurn(forTerminal: id)
+            // Working again after asking: the question was answered.
+            if case .needsInput? = layout.attention[id] { clearAttention(terminal: id) }
         case .turnFinished:
             layout.setTurn(false, forTerminal: id)
             ring(.finished, terminal: id, in: item)
         case .needsInput(let detail):
             if message.event == "permission-request" { lastPermissionRequest[id] = Date() }
-            layout.setTurn(false, forTerminal: id)
+            // The turn stays open: once the user answers, the agent goes on
+            // without another prompt hook. While it waits it does not count
+            // for the café (WorkRule: needsInput is idle).
             ring(.needsInput(detail), terminal: id, in: item)
         }
     }

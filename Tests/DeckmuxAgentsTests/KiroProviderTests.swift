@@ -28,7 +28,7 @@ private let kiro = KiroProvider()
     let json = try JSONValue(parsing: text)
     #expect(json["version"]?.stringValue == "v1")
     let hooks = json["hooks"]?.arrayValue ?? []
-    #expect(hooks.compactMap { $0["trigger"]?.stringValue } == ["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"])
+    #expect(hooks.compactMap { $0["trigger"]?.stringValue } == ["SessionStart", "UserPromptSubmit", "Stop", "PostToolUse", "SessionEnd"])
     #expect(hooks.first?["name"]?.stringValue == "deckmux-session-start")
     #expect(hooks.first?["action"]?["type"]?.stringValue == "command")
     #expect(hooks.first?["action"]?["command"]?.stringValue == AgentHookFile.command(agent: .kiro, event: "session-start"))

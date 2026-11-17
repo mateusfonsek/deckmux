@@ -22,6 +22,29 @@ public enum CodexUsage {
         return UsageWindow(percent: percent, resetsAt: resets)
     }
 
+    /// The limits from the newest session that has them: a session just
+    /// started has none yet. Looks at the last few files, newest first.
+    public static func latestUsage(codexHome: URL, files limit: Int = 8) -> Usage? {
+        for file in sessionFiles(codexHome: codexHome).prefix(limit) {
+            guard let text = try? String(contentsOf: file.url, encoding: .utf8),
+                  let usage = parse(jsonl: text, fetchedAt: file.modified) else { continue }
+            return usage
+        }
+        return nil
+    }
+
+    /// Session files under `<codexHome>/sessions`, newest first.
+    static func sessionFiles(codexHome: URL) -> [(url: URL, modified: Date)] {
+        let sessions = codexHome.appendingPathComponent("sessions")
+        guard FileManager.default.fileExists(atPath: sessions.path),
+              let files = FileManager.default.enumerator(at: sessions, includingPropertiesForKeys: [.contentModificationDateKey]) else { return [] }
+        var found: [(url: URL, modified: Date)] = []
+        for case let file as URL in files where file.pathExtension == "jsonl" {
+            found.append((file, (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast))
+        }
+        return found.sorted { $0.modified > $1.modified }
+    }
+
     /// The session file Codex wrote last, under `<codexHome>/sessions`.
     public static func latestSessionFile(codexHome: URL) -> URL? {
         let sessions = codexHome.appendingPathComponent("sessions")

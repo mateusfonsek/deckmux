@@ -24,9 +24,16 @@ public enum AgentContextLayout: Equatable, Sendable {
 public enum AgentContextMigration {
     public static let importLine = "@AGENTS.md"
 
+    /// CLAUDE.md starts with the import (its own text, if any, below it).
     public static func isMigrated(claudeMd: String?) -> Bool {
-        claudeMd?.trimmingCharacters(in: .whitespacesAndNewlines) == importLine
+        let first = claudeMd?.split(separator: "\n", omittingEmptySubsequences: true)
+            .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        return first?.trimmingCharacters(in: .whitespaces) == importLine
     }
+
+    /// Whether the workspace's AGENTS.md came from Deckmux's migration (so
+    /// deleting the workspace's configuration may delete it).
+    public static func ownsAgentsMd(claudeMd: String?) -> Bool { isMigrated(claudeMd: claudeMd) }
 
     /// The new texts (agents nil: leave AGENTS.md as is), or nil when there is
     /// nothing to do. No text is ever dropped.

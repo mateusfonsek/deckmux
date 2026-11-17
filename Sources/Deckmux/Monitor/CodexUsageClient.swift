@@ -37,11 +37,7 @@ final class CodexUsageClient: AgentUsageFeed {
         }
     }
 
-    /// The newest session that has limits (a fresh one may have none yet).
     nonisolated static func latestUsage(codexHome: URL) -> Usage? {
-        guard let file = CodexUsage.latestSessionFile(codexHome: codexHome),
-              let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
-        let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
-        return CodexUsage.parse(jsonl: text, fetchedAt: modified)
+        CodexUsage.latestUsage(codexHome: codexHome)
     }
 }

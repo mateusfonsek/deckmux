@@ -28,6 +28,7 @@ public struct KiroProvider: AgentProvider {
             .init("SessionStart", "session-start"),
             .init("UserPromptSubmit", "prompt"),
             .init("Stop", "stop"),
+            .init("PostToolUse", "activity"),
             .init("SessionEnd", "session-end"),
         ])
     }
@@ -40,6 +41,7 @@ public struct KiroProvider: AgentProvider {
         case "prompt": return .turnStarted
         case "stop": return .turnFinished
         case "session-end": return .sessionEnded
+        case "activity": return .activity
         default: return nil
         }
     }

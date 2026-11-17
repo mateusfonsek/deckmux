@@ -14,7 +14,7 @@ enum AgentActivation {
         let provider = AgentRegistry.provider(for: kind)
         guard on else {
             settings.setEnabled(kind, false)
-            if kind == .codex { notice(nil) }
+            if provider.postInstallNotice != nil { notice(nil) }
             review.propose(disabling(kind), applyTitle: "Remover")
             return
         }
@@ -22,7 +22,7 @@ enum AgentActivation {
             if await UserShell.find(provider.executable) == nil, !confirmMissing(provider) { return }
             review.propose(enabling(kind, workspaces: review.store.workspaces), applyTitle: "Ligar \(provider.displayName)") {
                 settings.setEnabled(kind, true)
-                if kind == .codex { notice(codexTrustNotice) }
+                if let text = provider.postInstallNotice { notice(text) }
             }
         }
     }
@@ -85,9 +85,4 @@ enum AgentActivation {
         return false
     }
 
-    /// Codex runs a hook only after the user trusts it in `/hooks`.
-    static let codexTrustNotice = """
-        Falta um passo: abra o Codex, digite /hooks e aprove os avisos do Deckmux. É uma vez só; \
-        sem isso o Deckmux não sabe quando o Codex trabalha ou termina.
-        """
 }

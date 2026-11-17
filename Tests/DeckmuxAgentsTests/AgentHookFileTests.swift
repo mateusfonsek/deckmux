@@ -17,7 +17,7 @@ private func commands(_ text: String?, event: String) throws -> [String] {
     let text = try file.edited(nil, install: true, agent: .codex)
     #expect(try commands(text, event: "Stop") == [deckmuxStop])
     #expect(try commands(text, event: "UserPromptSubmit") == [#"[ -x "$DECKMUX_CLI" ] && "$DECKMUX_CLI" hook codex prompt || true"#])
-    for event in ["SessionStart", "UserPromptSubmit", "Stop", "PermissionRequest", "SessionEnd"] {
+    for event in ["SessionStart", "UserPromptSubmit", "Stop", "PermissionRequest", "PostToolUse", "SessionEnd"] {
         #expect(try commands(text, event: event).count == 1)
     }
     #expect(text?.contains(#""timeout": 5"#) == true)

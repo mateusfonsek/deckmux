@@ -36,11 +36,14 @@ public protocol AgentProvider: Sendable {
     /// Whether it writes subagent transcripts Deckmux can follow
     /// (`~/.claude/projects/<folder>/<session>/subagents`).
     var keepsSubagentTranscripts: Bool { get }
+    /// What the user still has to do once the agent is on (Codex: trust the hooks).
+    var postInstallNotice: String? { get }
 }
 
 extension AgentProvider {
     public var usageSource: AgentUsageSource? { nil }
     public var keepsSubagentTranscripts: Bool { false }
+    public var postInstallNotice: String? { nil }
 }
 
 public enum Shell {

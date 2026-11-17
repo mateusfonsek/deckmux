@@ -41,8 +41,15 @@ public struct CodexProvider: AgentProvider {
             .init("UserPromptSubmit", "prompt"),
             .init("Stop", "stop"),
             .init("PermissionRequest", "permission-request"),
+            .init("PostToolUse", "activity"),
             .init("SessionEnd", "session-end"),
         ])
+    }
+
+    /// Codex runs a hook only after the user trusts it in `/hooks`.
+    public var postInstallNotice: String? {
+        "Falta um passo: abra o Codex, digite /hooks e aprove os avisos do Deckmux. É uma vez só; "
+            + "sem isso o Deckmux não sabe quando o Codex trabalha ou termina."
     }
 
     public func event(hook: String, payload: [String: String]) -> AgentEvent? {
@@ -54,6 +61,7 @@ public struct CodexProvider: AgentProvider {
         case "stop": return .turnFinished
         case "permission-request": return .needsInput(payload["tool_name"].map { "Quer usar \($0)" })
         case "session-end": return .sessionEnded
+        case "activity": return .activity
         default: return nil
         }
     }

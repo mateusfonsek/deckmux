@@ -250,7 +250,6 @@ struct WorkspaceOperations {
         var changes = [
             FileChange(url: Self.manifestURL(workspace.root), isGlobal: false, summary: "Manifesto", operation: .edit { _ in nil }),
             FileChange(url: Self.claudeMdURL(workspace.root), isGlobal: false, summary: "Contexto do workspace", operation: .edit { _ in nil }),
-            FileChange(url: Self.agentsMdURL(workspace.root), isGlobal: false, summary: "Contexto do workspace para as IAs", operation: .edit { _ in nil }),
             FileChange(url: Self.mcpURL(workspace.root), isGlobal: false, summary: "MCPs do workspace", operation: .edit { _ in nil }),
             FileChange(url: Self.settingsURL(workspace.root), isGlobal: false, summary: "Settings do Claude Code na raiz", operation: .edit { _ in nil }),
             FileChange(url: ConfigPaths.theme(slug: workspace.id), isGlobal: true, summary: "Tema custom:\(workspace.id)", operation: .edit { _ in nil }),
@@ -260,6 +259,11 @@ struct WorkspaceOperations {
             guideChange(summaries(replacing: workspace.id, with: nil)),
         ]
         if !names.isEmpty { changes.insert(approvalChange(names, approved: false), at: 5) }
+        // AGENTS.md only when Deckmux moved the context there; a repo's own stays.
+        if AgentContextMigration.ownsAgentsMd(claudeMd: try? String(contentsOf: Self.claudeMdURL(workspace.root), encoding: .utf8)) {
+            changes.append(FileChange(url: Self.agentsMdURL(workspace.root), isGlobal: false,
+                                      summary: "Contexto do workspace para as IAs", operation: .edit { _ in nil }))
+        }
         // Every agent's file, on or off: only the workspace's servers come out.
         if !names.isEmpty {
             changes += Self.agentMcpChanges(root: workspace.root, adding: [], removing: names, agents: AgentKind.allCases)

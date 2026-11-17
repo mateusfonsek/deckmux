@@ -29,7 +29,11 @@ public enum TomlTables {
         while index < lines.count {
             guard let header = header(lines[index]), own.contains(header) else { index += 1; continue }
             var end = index + 1
-            while end < lines.count, self.header(lines[end]) == nil { end += 1 }
+            while end < lines.count, !isTableStart(lines[end]) { end += 1 }
+            // Comments right above the next table belong to it.
+            if end < lines.count {
+                while end - 1 > index, lines[end - 1].trimmingCharacters(in: .whitespaces).hasPrefix("#") { end -= 1 }
+            }
             let atEnd = end == lines.count
             lines.removeSubrange(index..<end)
             if atEnd {
@@ -41,6 +45,11 @@ public enum TomlTables {
             }
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// `[table]` or `[[array of tables]]`: either ends the block above it.
+    private static func isTableStart(_ line: String) -> Bool {
+        line.trimmingCharacters(in: .whitespaces).hasPrefix("[")
     }
 
     private static func header(_ line: String) -> String? {

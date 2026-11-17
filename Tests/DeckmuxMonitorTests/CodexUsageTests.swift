@@ -35,3 +35,15 @@ private let older = #"{"type":"event_msg","payload":{"type":"token_count","rate_
     #expect(CodexUsage.latestSessionFile(codexHome: home)?.lastPathComponent == "rollout-b.jsonl")
     #expect(CodexUsage.latestSessionFile(codexHome: home.appendingPathComponent("none")) == nil)
 }
+
+// Re-graded minor: a fresh session file without limits falls back to older ones.
+@Test func codexUsageSkipsAFreshSessionWithoutLimits() throws {
+    let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let day = home.appendingPathComponent("sessions/2026/11/17")
+    try FileManager.default.createDirectory(at: day, withIntermediateDirectories: true)
+    let withLimits = day.appendingPathComponent("rollout-a.jsonl"), fresh = day.appendingPathComponent("rollout-b.jsonl")
+    try Data(tokenCount.utf8).write(to: withLimits)
+    try Data(#"{"type":"session_meta","payload":{}}"#.utf8).write(to: fresh)
+    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -60)], ofItemAtPath: withLimits.path)
+    #expect(CodexUsage.latestUsage(codexHome: home)?.fiveHour?.percent == 2.0)
+}

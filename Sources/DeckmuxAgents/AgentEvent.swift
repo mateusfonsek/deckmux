@@ -10,4 +10,20 @@ public enum AgentEvent: Equatable, Sendable {
     case turnFinished
     /// The agent waits on a permission prompt or a question.
     case needsInput(String?)
+    /// The agent used a tool: its turn is still alive.
+    case activity
+}
+
+/// When an open turn of an agent that reports work through hooks still
+/// counts as working. Without a heartbeat (a tool used) for this long, the
+/// turn is taken as over: an interrupt that sends no Stop must not keep the
+/// symbol spinning or the Mac awake.
+public enum TurnRule {
+    public static let staleTurn: TimeInterval = 600
+
+    public static func isWorking(turnOpen: Bool, lastActivity: Date?, now: Date) -> Bool {
+        guard turnOpen else { return false }
+        guard let lastActivity else { return true }
+        return now.timeIntervalSince(lastActivity) <= staleTurn
+    }
 }
