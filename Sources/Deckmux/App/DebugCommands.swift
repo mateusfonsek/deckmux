@@ -11,6 +11,8 @@ import UserNotifications
 /// - `type <text>` / `enter` type into the selected item's focused terminal.
 /// - `appearance light|dark` switches the app's appearance.
 /// - `notes` prints the delivered notifications.
+/// - `state` prints each terminal's agent session, turn, working state and bell,
+///   and each sidebar item's agent.
 /// - `snap <dir>` writes every visible window, the café panel and the menu bar
 ///   face as PNGs into <dir> (rendered by the app, no screen recording needed).
 @MainActor
@@ -54,6 +56,15 @@ enum DebugCommands {
                 for note in notes { print("[debug] note \(note.request.identifier): \(note.request.content.body)") }
                 print("[debug] notes: \(notes.count)")
             }
+        case "state":
+            for item in window.deck.items {
+                let layout = item.layout
+                print("[debug] item \(item.displayName) agent=\(item.runningAgent?.rawValue ?? "-") working=\(item.agentWorking)")
+                for (id, session) in layout.agentSessions {
+                    print("[debug]   \(session.agent.rawValue) \(session.sessionID) turn=\(layout.agentTurns.contains(id)) working=\(AgentWork.isWorking(terminal: id, in: layout)) bell=\(String(describing: layout.attention[id]))")
+                }
+            }
+            print("[debug] status: \(AgentStatus.current(in: window.deck).label)")
         default: print("[debug] unknown command")
         }
     }

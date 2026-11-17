@@ -1,12 +1,14 @@
 import AppKit
+import DeckmuxAgents
 import OSLog
 import UserNotifications
 
-/// Turns Claude Code hook messages into Deckmux state: the conversation each
-/// terminal runs (for resuming it later), the bell on its sidebar item and tab,
-/// and a macOS notification when the user is not looking at that terminal.
+/// Turns agent hook messages into Deckmux state: the conversation each
+/// terminal runs (for resuming it later), whether its turn is open, the bell
+/// on its sidebar item and tab, and a macOS notification when the user is not
+/// looking at that terminal. Each agent's provider translates its own hooks.
 @MainActor
-final class ClaudeHookCenter {
+final class AgentHookCenter {
     nonisolated private static let logger = Logger(subsystem: "dev.fonsek.deckmux", category: "agent")
     nonisolated static let terminalKey = "deckmux.terminal"
 
@@ -40,28 +42,30 @@ final class ClaudeHookCenter {
               let id = message.terminalID,
               let item = deck.item(withTerminal: id) else { return }
         let layout = item.layout
-        switch message.event {
-        case "session-start":
-            guard let session = message.string("session_id") else { return }
-            layout.setClaudeSession(ClaudeSession(sessionID: session, directory: message.string("cwd")), forTerminal: id)
-        case "session-end":
-            layout.setClaudeSession(nil, forTerminal: id)
+        let payload = message.stringPayload
+        // Claude Code's permission Notification repeats its PermissionRequest.
+        if message.agent == .claude, message.event == "notification", payload["notification_type"] == "permission_prompt",
+           let last = lastPermissionRequest[id], Date().timeIntervalSince(last) < 10 { return }
+        guard let event = AgentRegistry.provider(for: message.agent).event(hook: message.event, payload: payload) else {
+            Self.logger.debug("Unhandled hook event \(message.agent.rawValue, privacy: .public) \(message.event, privacy: .public)")
+            return
+        }
+        switch event {
+        case .sessionStarted(let session, let cwd):
+            layout.setAgentSession(AgentSession(agent: message.agent, sessionID: session, directory: cwd), forTerminal: id)
+        case .sessionEnded:
+            layout.setAgentSession(nil, forTerminal: id)
             clearAttention(terminal: id)
-        case "stop":
+        case .turnStarted:
+            layout.setTurn(true, forTerminal: id)
+            clearAttention(terminal: id)
+        case .turnFinished:
+            layout.setTurn(false, forTerminal: id)
             ring(.finished, terminal: id, in: item)
-        case "permission-request":
-            lastPermissionRequest[id] = Date()
-            let tool = message.string("tool_name")
-            ring(.needsInput(tool.map { "Quer usar \($0)" }), terminal: id, in: item)
-        case "notification":
-            // The idle reminder repeats what Stop already said; the permission
-            // one repeats PermissionRequest.
-            let kind = message.string("notification_type")
-            if kind == "idle_prompt" { return }
-            if kind == "permission_prompt", let last = lastPermissionRequest[id], Date().timeIntervalSince(last) < 10 { return }
-            ring(.needsInput(message.string("message")), terminal: id, in: item)
-        default:
-            Self.logger.debug("Unhandled hook event \(message.event, privacy: .public)")
+        case .needsInput(let detail):
+            if message.event == "permission-request" { lastPermissionRequest[id] = Date() }
+            layout.setTurn(false, forTerminal: id)
+            ring(.needsInput(detail), terminal: id, in: item)
         }
     }
 
@@ -100,11 +104,12 @@ final class ClaudeHookCenter {
         let workspace = deck.workspace(of: item)?.name
         content.title = [workspace, item.layout.terminal(withID: id).map { TerminalLabel.folderName($0.pwd) }]
             .compactMap { $0 }.joined(separator: " · ")
+        let name = item.layout.agentSessions[id].map { AgentRegistry.provider(for: $0.agent).displayName } ?? "IA"
         switch attention {
         case .finished:
-            content.body = "Claude terminou."
+            content.body = "\(name) terminou."
         case .needsInput(let detail):
-            content.body = detail.map { "Claude precisa de você: \($0)" } ?? "Claude precisa de você."
+            content.body = detail.map { "\(name) precisa de você: \($0)" } ?? "\(name) precisa de você."
         }
         content.sound = .default
         content.userInfo = [Self.terminalKey: id.uuidString]

@@ -1,50 +1,58 @@
 import AppKit
 import Combine
+import DeckmuxAgents
 import DeckmuxCaffeine
 import DeckmuxCalendar
 import OSLog
 import SwiftUI
 
-/// What Claude Code is doing across all of Deckmux, the most urgent first.
+/// What the agents are doing across all of Deckmux, the most urgent first.
 enum AgentStatus: Equatable {
     /// Some terminal waits on a permission prompt or a question.
     case needsInput
     /// Some terminal finished and the user has not looked at it yet.
     case finished
-    /// Some terminal's Claude is working.
+    /// Some terminal's agent is working.
     case working
     case idle
 
     @MainActor static func current(in deck: Deck) -> AgentStatus {
         var finished = false
         var working = false
+        var needsInput = false
+        var kinds = Set<AgentKind>()
         for item in deck.items {
             let layout = item.layout
+            kinds.formUnion(layout.agentSessions.values.map(\.agent))
             for kind in layout.attention.values {
-                if case .needsInput = kind { return .needsInput }
+                if case .needsInput = kind { needsInput = true }
                 finished = true
             }
             if !working {
-                working = layout.claudeSessions.keys.contains { id in
-                    layout.terminal(withID: id).map(TerminalLabel.isWorking) ?? false
-                }
+                working = layout.agentSessions.keys.contains { AgentWork.isWorking(terminal: $0, in: layout) }
             }
         }
-        return finished ? .finished : working ? .working : .idle
+        agentName = kinds.count == 1 ? AgentRegistry.provider(for: kinds.first!).displayName : "IA"
+        return needsInput ? .needsInput : finished ? .finished : working ? .working : .idle
     }
 
+    /// Who the labels talk about: the one agent running, or "IA" when there
+    /// are several (or none). Updated by `current(in:)`.
+    nonisolated(unsafe) static var agentName = "IA"
+
     var label: String {
-        switch self {
-        case .needsInput: "Claude precisa de você"
-        case .finished: "Claude terminou"
-        case .working: "Claude trabalhando…"
+        let name = Self.agentName
+        return switch self {
+        case .needsInput: "\(name) precisa de você"
+        case .finished: "\(name) terminou"
+        case .working: "\(name) trabalhando…"
         case .idle: "Nada a fazer"
         }
     }
 }
 
 /// The Deckmux face in the menu bar: asleep when idle, looking
-/// around while Claude works, happy when it finished, wide awake with an
+/// around while an agent works, happy when it finished, wide awake with an
 /// orange dot when it needs the user, and a count when two or more terminals
 /// wait. Its menu is a quick look, not a second app: the state, the next
 /// meeting, the terminals waiting and a few shortcuts.
@@ -94,11 +102,11 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
         }
     }
 
-    /// Follows the deck (bells, Claude sessions, the focused terminal's
-    /// state) and, only while some terminal runs Claude Code, looks every
+    /// Follows the deck (bells, agent sessions, the focused terminal's
+    /// state) and, only while some terminal runs an agent, looks every
     /// 0.6 s instead of observing every terminal's title, which Claude Code
     /// changes ten times a second while it works. The same tick moves the
-    /// eyes. Without Claude the timer is off: nothing wakes the app.
+    /// eyes. Without agents the timer is off: nothing wakes the app.
     func start() {
         deckObserver = deck.objectWillChange
             .receive(on: DispatchQueue.main)
@@ -108,14 +116,14 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
 
     private func deckDidChange() {
         update()
-        let runsClaude = deck.items.contains { !$0.layout.claudeSessions.isEmpty }
-        if runsClaude, timer == nil {
+        let runsAgent = deck.items.contains { !$0.layout.agentSessions.isEmpty }
+        if runsAgent, timer == nil {
             let timer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.update() }
             }
             timer.tolerance = 0.1
             self.timer = timer
-        } else if !runsClaude, let timer {
+        } else if !runsAgent, let timer {
             timer.invalidate()
             self.timer = nil
         }
@@ -230,26 +238,25 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
 
     /// "1 pergunta · 2 terminaram · 1 trabalhando", or what there is instead.
     private func summary() -> String {
-        var questions = 0, finished = 0, working = 0, claude = 0
+        var questions = 0, finished = 0, working = 0, agents = 0
         for item in deck.items {
             let layout = item.layout
             for kind in layout.attention.values {
                 if case .needsInput = kind { questions += 1 } else { finished += 1 }
             }
-            claude += layout.claudeSessions.count
-            working += layout.claudeSessions.keys.filter { id in
-                layout.terminal(withID: id).map(TerminalLabel.isWorking) ?? false
-            }.count
+            agents += layout.agentSessions.count
+            working += layout.agentSessions.keys.filter { AgentWork.isWorking(terminal: $0, in: layout) }.count
         }
         var parts: [String] = []
         if questions > 0 { parts.append(questions == 1 ? "1 pergunta" : "\(questions) perguntas") }
         if finished > 0 { parts.append(finished == 1 ? "1 terminou" : "\(finished) terminaram") }
         if working > 0 { parts.append("\(working) trabalhando") }
         if !parts.isEmpty { return parts.joined(separator: " · ") }
-        switch claude {
-        case 0: return "Nenhum terminal com Claude"
-        case 1: return "1 terminal com Claude, parado"
-        default: return "\(claude) terminais com Claude, parados"
+        let name = AgentStatus.agentName
+        switch agents {
+        case 0: return "Nenhum terminal com IA"
+        case 1: return "1 terminal com \(name), parado"
+        default: return "\(agents) terminais com \(name), parados"
         }
     }
 
@@ -292,7 +299,7 @@ final class AgentStatusItem: NSObject, NSMenuDelegate {
             for (id, kind) in layout.attention {
                 let surface = layout.terminal(withID: id)
                 let name = TerminalLabel.plainName(pwd: surface?.pwd, title: surface?.title ?? "",
-                                                   runsClaude: layout.claudeSessions[id] != nil)
+                                                   agent: layout.agentSessions[id]?.agent)
                 let since = layout.attentionSince[id] ?? now
                 let reason: String
                 let isQuestion: Bool

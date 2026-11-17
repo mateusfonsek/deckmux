@@ -183,7 +183,7 @@ struct McpTab: View {
     /// Slack and ClickUp log in through Claude Code's own /mcp screen.
     private func authenticate(_ name: String) {
         authHint = "Abri o /mcp do Claude num terminal em \(workspace.name): escolha \(name) → Authenticate e faça o login no navegador com a conta da \(workspace.name). Depois volte aqui e clique em Verificar."
-        ClaudeCodeSetup.whenInstalled { [model, workspace] in model.openTerminal?(workspace.root, "claude '/mcp'\n") }
+        AgentSetup.whenInstalled(.claude) { [model, workspace] in model.openTerminal?(workspace.root, "claude '/mcp'\n") }
     }
 
     private func connectGoogle(server: String) {
@@ -314,8 +314,8 @@ private struct GoogleForm: View {
                     Label("O MCP do Google precisa do uv (comando uvx), que não está instalado.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                     HStack {
-                        Text(ClaudeCodeSetup.uvInstallCommand).font(Theme.Font.mono).textSelection(.enabled)
-                        Button("Copiar") { ClaudeCodeSetup.copy(ClaudeCodeSetup.uvInstallCommand) }
+                        Text(AgentSetup.uvInstallCommand).font(Theme.Font.mono).textSelection(.enabled)
+                        Button("Copiar") { AgentSetup.copy(AgentSetup.uvInstallCommand) }
                     }
                     Text("Rode no Terminal e depois abra um terminal novo no Deckmux.").foregroundStyle(.secondary)
                 }

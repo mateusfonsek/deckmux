@@ -54,7 +54,7 @@ struct TaskManagerLayout: Sendable {
                     guard let surface = layout.surface(for: tab) else { return nil }  // code tabs have no processes
                     let tty = surface.surfaceModel?.ttyName
                     return Terminal(id: surface.id,
-                                    title: TerminalLabel.tabName(pwd: surface.pwd, title: surface.title, runsClaude: layout.runsClaude(surface)),
+                                    title: TerminalLabel.tabName(pwd: surface.pwd, title: surface.title, agent: layout.runningAgent(surface)),
                                     ttyName: tty, device: tty.flatMap(ProcessTable.ttyDevice(named:)),
                                     isSelected: selectedTab == tab, foregroundPID: surface.surfaceModel?.foregroundPID)
                 }

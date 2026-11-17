@@ -97,7 +97,7 @@ enum McpStatusChecker {
     static func check(root: URL) async -> Result<[String: McpHealth], ApplyError> {
         let path = await UserShell.path()
         guard let claude = UserShell.claudeExecutable(path: path) else {
-            return .failure(ApplyError(message: ClaudeCodeSetup.missingMessage))
+            return .failure(ApplyError(message: AgentSetup.missingMessage(.claude)))
         }
         let output = await UserShell.run(claude, ["mcp", "list"], in: root, path: path)
         guard output.status == 0 || !output.stdout.isEmpty else {

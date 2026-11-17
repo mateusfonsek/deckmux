@@ -4,7 +4,7 @@ import DeckmuxMonitor
 /// What keeps a chat counting as working.
 public enum ChatWork: Equatable, Sendable {
     case idle
-    /// Claude's spinner is in the title.
+    /// The agent is working (Claude's spinner, or another agent's open turn).
     case working
     /// Only background subagents are running.
     case subagents(Int)

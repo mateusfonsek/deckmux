@@ -1,17 +1,18 @@
 import Foundation
 
-/// Why a terminal's Claude Code wants the user back.
+/// Why a terminal's agent wants the user back.
 enum AgentAttention: Equatable {
-    /// Claude finished its turn.
+    /// The agent finished its turn.
     case finished
-    /// Claude is waiting on a permission prompt or a question.
+    /// The agent is waiting on a permission prompt or a question.
     case needsInput(String?)
 }
 
 /// How Deckmux terminals talk to the app: each one gets its ID, the socket
-/// and the bundled `claude` wrapper ahead on `PATH`. The wrapper adds hooks
-/// through `--settings` only for that launch; `~/.claude/settings.json` is
-/// never touched.
+/// and the bundled `claude` wrapper ahead on `PATH`. The wrapper adds Claude
+/// Code's hooks through `--settings` only for that launch;
+/// `~/.claude/settings.json` is never touched. Other agents get theirs from
+/// files Deckmux installs when they are turned on in Ajustes.
 enum AgentIntegration {
     static var socketPath: String {
         SessionStore.directory.appendingPathComponent("deckmux.sock").path

@@ -1,10 +1,11 @@
+import DeckmuxAgents
 import Foundation
 import DeckmuxChat
 import DeckmuxCode
 
 /// Everything Deckmux brings back on the next launch: the sidebar items in
 /// order, each item's splits and tabs, and per terminal its folder and the
-/// Claude Code conversation it was running. Scrollback is stored next to it,
+/// agent conversation it was running. Scrollback is stored next to it,
 /// one file per terminal (see `SessionStore`).
 struct SessionSnapshot: Codable, Equatable {
     static let currentVersion = 1
@@ -74,31 +75,39 @@ struct SessionSnapshot: Codable, Equatable {
     struct Terminal: Codable, Equatable {
         var id: UUID
         var directory: String?
-        var claude: ClaudeSession?
+        /// The agent conversation it was running. Sessions saved before
+        /// multi-agent support stored it as `claude` (see SavedAgentSession).
+        var agent: AgentSession?
         /// "code" for a code tab; nil for a terminal.
         var kind: String? = nil
         var code: CodeTabState? = nil
-    }
-}
 
-/// A Claude Code conversation running in a terminal, as reported by its
-/// SessionStart hook.
-struct ClaudeSession: Codable, Equatable {
-    var sessionID: String
-    var directory: String?
+        init(id: UUID, directory: String?, agent: AgentSession?, kind: String? = nil, code: CodeTabState? = nil) {
+            self.id = id
+            self.directory = directory
+            self.agent = agent
+            self.kind = kind
+            self.code = code
+        }
 
-    /// Whether Claude Code saved this conversation. One closed before any
-    /// message (only /mcp, say) has no transcript, and `--resume` would fail.
-    /// nil when it cannot tell (no projects folder where expected).
-    var hasTranscript: Bool? {
-        guard let directory else { return nil }
-        let configDir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) }
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".claude")
-        let projects = configDir.appendingPathComponent("projects")
-        guard FileManager.default.fileExists(atPath: projects.path) else { return nil }
-        // Claude Code names a project's folder after its path, every
-        // character other than a letter or digit turned into "-".
-        let folder = String(directory.map { $0.isLetter && $0.isASCII || $0.isNumber ? $0 : "-" })
-        return FileManager.default.fileExists(atPath: projects.appendingPathComponent(folder).appendingPathComponent("\(sessionID).jsonl").path)
+        private enum CodingKeys: String, CodingKey { case id, directory, agent, claude, kind, code }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            directory = try container.decodeIfPresent(String.self, forKey: .directory)
+            agent = try SavedAgentSession.decode(container, key: .agent, legacyClaudeKey: .claude)
+            kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            code = try container.decodeIfPresent(CodeTabState.self, forKey: .code)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encodeIfPresent(directory, forKey: .directory)
+            try container.encodeIfPresent(agent, forKey: .agent)
+            try container.encodeIfPresent(kind, forKey: .kind)
+            try container.encodeIfPresent(code, forKey: .code)
+        }
     }
 }

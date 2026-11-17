@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import DeckmuxCaffeine
 import DeckmuxChat
 import SwiftUI
@@ -344,13 +345,18 @@ private struct SidebarRow: View {
             Image(systemName: TerminalLayout.codeTabIcon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(color)
-        } else if item.runsClaude {
-            ClaudeMark(working: item.claudeWorking, color: color)
+        } else if let agent = item.runningAgent {
+            AgentMark(agent: agent, working: item.agentWorking, color: color)
         } else {
             Image(systemName: "terminal.fill")
                 .font(.system(size: 14))
                 .foregroundStyle(color)
         }
+    }
+
+    /// The name of the agent the item shows ("IA" before any reported in).
+    private var agentName: String {
+        item.runningAgent.map { AgentRegistry.provider(for: $0).displayName } ?? "IA"
     }
 
     /// The user's tag, then the state or the folder.
@@ -366,12 +372,12 @@ private struct SidebarRow: View {
         if let attention = item.attention {
             switch attention.kind {
             case .needsInput: Text("Esperando você").foregroundStyle(Theme.attention).fontWeight(.medium)
-            case .finished: Text("Claude terminou").foregroundStyle(Theme.attention)
+            case .finished: Text("\(agentName) terminou").foregroundStyle(Theme.attention)
             }
-        } else if case .subagents(let n)? = effect, !item.claudeWorking {
+        } else if case .subagents(let n)? = effect, !item.agentWorking {
             Text(n == 1 ? "1 sub-agente" : "\(n) sub-agentes").foregroundStyle(Theme.claude)
-        } else if item.claudeWorking {
-            Text("Claude trabalhando…").foregroundStyle(Theme.claude)
+        } else if item.agentWorking {
+            Text("\(agentName) trabalhando…").foregroundStyle(Theme.claude)
         } else {
             HStack(spacing: 4) {
                 if let branch = item.branch {
@@ -411,7 +417,7 @@ private struct SidebarRow: View {
             }
         } else if item.attention != nil {
             Circle().fill(Theme.attention).frame(width: 8, height: 8)
-                .help("O Claude está esperando você")
+                .help("\(agentName) está esperando você")
         } else if effect != nil {
             Image(systemName: "cup.and.saucer.fill")
                 .font(.system(size: 10))
@@ -441,7 +447,7 @@ private struct SidebarRow: View {
 
 /// The café's outline around a sidebar row. The breathing is a Core Animation
 /// animation on the layer, run by the render server, for the same reason as
-/// ClaudeMark: SwiftUI's repeatForever re-renders the sidebar every frame.
+/// AgentMark: SwiftUI's repeatForever re-renders the sidebar every frame.
 struct CaffeineOutline: NSViewRepresentable {
     let color: NSColor
 
@@ -514,28 +520,31 @@ final class CaffeineOutlineView: NSView {
     }
 }
 
-/// ✳ in the item's workspace color, as tall as the terminal and code icons
-/// beside it; it turns while Claude works. The turn is a Core Animation
+/// The agent's glyph (✳ for Claude) in the item's workspace color, as tall as
+/// the terminal and code icons beside it; it turns while the agent works. The turn is a Core Animation
 /// animation on the glyph's layer, run by the render server: SwiftUI's
-/// repeatForever re-rendered the whole sidebar every frame while Claude
-/// worked, and kept doing it after Claude stopped.
-struct ClaudeMark: NSViewRepresentable {
+/// repeatForever re-rendered the whole sidebar every frame while the agent
+/// worked, and kept doing it after it stopped.
+struct AgentMark: NSViewRepresentable {
+    let agent: AgentKind
     let working: Bool
-    var color: Color = Theme.claude
+    var color: Color? = nil
     var size: CGFloat = 18
 
-    func makeNSView(context: Context) -> ClaudeMarkView { ClaudeMarkView() }
+    func makeNSView(context: Context) -> AgentMarkView { AgentMarkView() }
 
-    func updateNSView(_ view: ClaudeMarkView, context: Context) {
-        view.update(color: NSColor(color), size: size, working: working)
+    func updateNSView(_ view: AgentMarkView, context: Context) {
+        let mark = AgentRegistry.provider(for: agent).mark
+        view.update(glyph: mark.glyph, color: color.map(NSColor.init) ?? NSColor(hex: mark.colorHex) ?? .labelColor,
+                    size: size, working: working)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ClaudeMarkView, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: AgentMarkView, context: Context) -> CGSize? {
         nsView.glyphSize
     }
 }
 
-final class ClaudeMarkView: NSView {
+final class AgentMarkView: NSView {
     private let glyph = CATextLayer()
     private(set) var glyphSize = CGSize.zero
     private var working = false
@@ -551,9 +560,9 @@ final class ClaudeMarkView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    func update(color: NSColor, size: CGFloat, working: Bool) {
+    func update(glyph symbol: String, color: NSColor, size: CGFloat, working: Bool) {
         let font = NSFont.systemFont(ofSize: size, weight: .bold)
-        let text = NSAttributedString(string: "✳", attributes: [.font: font, .foregroundColor: color])
+        let text = NSAttributedString(string: symbol, attributes: [.font: font, .foregroundColor: color])
         if text != glyph.string as? NSAttributedString {
             glyph.string = text
             let measured = text.size()

@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     let undoManager = ExpiringUndoManager()
     let workspaces: WorkspaceStore
     private var mainWindow: MainWindowController?
-    private var claudeHooks: ClaudeHookCenter?
+    private var agentHooks: AgentHookCenter?
     private var statusItem: AgentStatusItem?
     private var hotkey: GlobalHotkey?
     private var monitor: MonitorPanelController?
@@ -40,8 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let window = MainWindowController(ghostty: ghostty, workspaces: workspaces)
         mainWindow = window
         window.caffeine.start()
-        let hooks = ClaudeHookCenter(deck: window.deck)
-        claudeHooks = hooks
+        let hooks = AgentHookCenter(deck: window.deck)
+        agentHooks = hooks
         hooks.start()
         let status = AgentStatusItem(deck: window.deck, meetings: window.nextMeeting, tasks: window.tasks,
                                      reveal: { hooks.reveal(terminal: $0) }) { [weak self] in self?.bringToFront() }
@@ -108,7 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         MainActor.assumeIsolated {
-            claudeHooks?.clearFocusedAttention()
+            agentHooks?.clearFocusedAttention()
             monitor?.appDidBecomeActive()
         }
     }
@@ -146,11 +146,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         MainActor.assumeIsolated {
             autosaveTimer?.invalidate()
             // Claude sessions end as their terminals close; keep their IDs.
-            claudeHooks?.isTerminating = true
+            agentHooks?.isTerminating = true
             mainWindow?.caffeine.shutdown()
             saveSession(includingScrollback: true)
             SessionStore.flushScrollback()
-            claudeHooks?.stop()
+            agentHooks?.stop()
         }
     }
 
@@ -347,14 +347,14 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let terminal = (response.notification.request.content.userInfo[ClaudeHookCenter.terminalKey] as? String).flatMap(UUID.init(uuidString:))
+        let terminal = (response.notification.request.content.userInfo[AgentHookCenter.terminalKey] as? String).flatMap(UUID.init(uuidString:))
         let isCaffeine = response.notification.request.identifier == CaffeineController.notificationID
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 if isCaffeine {
                     self.bringToFront()
                 } else if let terminal {
-                    self.claudeHooks?.reveal(terminal: terminal)
+                    self.agentHooks?.reveal(terminal: terminal)
                 } else {
                     self.ghostty.handleUserNotification(response: response)
                 }

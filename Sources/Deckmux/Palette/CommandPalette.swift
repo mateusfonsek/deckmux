@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import DeckmuxCalendar
 import DeckmuxTasks
 import SwiftUI
@@ -48,7 +49,8 @@ enum PaletteEntries {
                 id: "item-\(item.id)", section: .items, title: item.displayName,
                 subtitle: [workspace?.name, item.branch, item.directory.map { ConfigPaths.display(URL(fileURLWithPath: $0)) }]
                     .compactMap { $0 }.joined(separator: " · "),
-                icon: item.runsClaude ? "sparkle" : "terminal.fill", color: item.runsClaude ? Theme.claude : workspace?.color,
+                icon: item.runningAgent != nil ? "sparkle" : "terminal.fill",
+                color: item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).mark.colorHex).map(Color.init) } ?? workspace?.color,
                 shortcut: shortcuts[item.id].map { "⌘\($0)" },
                 keywords: item.attention != nil ? "esperando atencao" : ""
             ) { deck.select(item) })

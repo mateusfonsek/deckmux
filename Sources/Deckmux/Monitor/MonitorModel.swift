@@ -1,8 +1,9 @@
 import AppKit
 import Combine
+import DeckmuxAgents
 import DeckmuxMonitor
 
-/// What a session's Claude is doing, most urgent first.
+/// What a session's agent is doing, most urgent first.
 enum MonitorState: Equatable {
     case needsInput(String?)
     case finished
@@ -36,7 +37,7 @@ enum MonitorState: Equatable {
     }
 }
 
-/// One Deckmux terminal running Claude Code, as the Janelinha shows it.
+/// One Deckmux terminal running an agent, as the Janelinha shows it.
 struct MonitorSession: Identifiable, Equatable {
     /// The terminal's ID.
     let id: UUID
@@ -51,6 +52,7 @@ struct MonitorSession: Identifiable, Equatable {
     var subagents: [SubagentInfo]
     var cwd: String?
     var sessionID: String
+    var agent: AgentKind
 }
 
 /// The Janelinha's data: the sessions of the deck's terminals, sampled every
@@ -136,7 +138,7 @@ final class MonitorModel: ObservableObject {
         for item in deck.items {
             let layout = item.layout
             let workspace = deck.workspace(of: item)
-            for (id, session) in layout.claudeSessions {
+            for (id, session) in layout.agentSessions {
                 seen.insert(id)
                 let surface = layout.terminal(withID: id)
                 let state: MonitorState
@@ -145,7 +147,7 @@ final class MonitorModel: ObservableObject {
                     case .needsInput(let detail): state = .needsInput(detail)
                     case .finished: state = .finished
                     }
-                } else if let surface, TerminalLabel.isWorking(surface) {
+                } else if AgentWork.isWorking(terminal: id, in: layout) {
                     state = .working
                 } else {
                     state = .idle
@@ -169,12 +171,13 @@ final class MonitorModel: ObservableObject {
                 }
                 built.append(MonitorSession(
                     id: id,
-                    name: TerminalLabel.plainName(pwd: surface?.pwd, title: surface?.title ?? "", runsClaude: true),
+                    name: TerminalLabel.plainName(pwd: surface?.pwd, title: surface?.title ?? "", agent: session.agent),
                     workspaceName: workspace?.name,
                     workspaceColor: workspace.flatMap { NSColor(hex: $0.manifest.color) },
                     state: state, since: since,
                     bars: (tracks[id] ?? PulseTrack()).minutes(now: now),
-                    subagents: agents, cwd: session.directory ?? surface?.pwd, sessionID: session.sessionID))
+                    subagents: agents, cwd: session.directory ?? surface?.pwd, sessionID: session.sessionID,
+                    agent: session.agent))
             }
         }
         for id in tracks.keys where !seen.contains(id) {
@@ -206,7 +209,7 @@ final class MonitorModel: ObservableObject {
         case .needsInput(let detail):
             return "\(detail ?? "Precisa de você") · \(AgentStatusItem.ago(session.since ?? now, now: now))"
         case .finished:
-            return "Claude terminou · \(AgentStatusItem.ago(session.since ?? now, now: now))"
+            return "\(AgentRegistry.provider(for: session.agent).displayName) terminou · \(AgentStatusItem.ago(session.since ?? now, now: now))"
         case .working:
             let minutes = Int(now.timeIntervalSince(session.since ?? now) / 60)
             return minutes < 1 ? "Trabalhando" : "Trabalhando · \(minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h \(String(format: "%02d", minutes % 60))")"
