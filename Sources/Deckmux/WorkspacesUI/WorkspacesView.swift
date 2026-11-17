@@ -96,14 +96,10 @@ struct WorkspacesView: View {
 }
 
 private struct WorkspaceDetail: View {
-    enum Tab: String, CaseIterable, Identifiable {
-        case general = "Geral", claude = "CLAUDE.md", mcps = "MCPs"
-        var id: String { rawValue }
-    }
+    typealias Tab = WorkspacesModel.DetailTab
 
     @ObservedObject var model: WorkspacesModel
     let workspace: Workspace
-    @State private var tab = Tab.general
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -115,7 +111,7 @@ private struct WorkspaceDetail: View {
                         .lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
-                Picker("", selection: $tab) {
+                Picker("", selection: $model.detailTab) {
                     ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
@@ -125,9 +121,9 @@ private struct WorkspaceDetail: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             Divider().opacity(0.6)
-            switch tab {
+            switch model.detailTab {
             case .general: GeneralTab(model: model, workspace: workspace)
-            case .claude: ClaudeMdTab(model: model, workspace: workspace)
+            case .context: ContextTab(model: model, workspace: workspace)
             case .mcps: McpTab(model: model, workspace: workspace)
             }
         }

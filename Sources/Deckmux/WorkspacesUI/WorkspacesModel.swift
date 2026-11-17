@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import SwiftUI
 
 /// State of the Workspaces tab: which workspace is open, the change waiting
@@ -17,9 +18,18 @@ final class WorkspacesModel: ObservableObject {
     @Published var review: Review?
     @Published var applyError: String?
     @Published var showsNewWorkspace = false
-    /// Health of each workspace's servers, by slug then server name.
-    @Published private(set) var mcpHealth: [String: [String: McpHealth]] = [:]
-    @Published private(set) var mcpCheckError: [String: String] = [:]
+
+    enum DetailTab: String, CaseIterable, Identifiable {
+        case general = "Geral", context = "Contexto", mcps = "MCPs"
+        var id: String { rawValue }
+    }
+
+    /// The tab of the selected workspace's settings.
+    @Published var detailTab = DetailTab.general
+    /// Health of each workspace's servers, by slug, agent, then server name.
+    @Published private(set) var mcpHealth: [String: [AgentKind: [String: McpHealth]]] = [:]
+    /// Why an agent's check failed, by slug then agent.
+    @Published private(set) var mcpCheckError: [String: [AgentKind: String]] = [:]
 
     /// Opens a terminal item in a folder, typing `input` into its shell.
     var openTerminal: ((URL, String?) -> Void)?
@@ -64,21 +74,32 @@ final class WorkspacesModel: ObservableObject {
     func refreshHealth(_ workspace: Workspace) {
         let slug = workspace.id
         let names = WorkspaceOperations.mcpNames(in: workspace.root)
-        mcpHealth[slug] = Dictionary(uniqueKeysWithValues: names.map { ($0, McpHealth.checking) })
+        let agents = AgentSettings.shared.enabled.filter { AgentRegistry.provider(for: $0).mcp != nil }
+        let checking = Dictionary(uniqueKeysWithValues: names.map { ($0, McpHealth.checking) })
+        mcpHealth[slug] = Dictionary(uniqueKeysWithValues: agents.map { ($0, checking) })
         mcpCheckError[slug] = nil
         Task {
-            let result = await McpStatusChecker.check(root: workspace.root)
-            switch result {
-            case .success(let health):
-                mcpHealth[slug] = Dictionary(uniqueKeysWithValues: names.map { ($0, health[$0] ?? .unknown) })
-            case .failure(let error):
-                mcpHealth[slug] = [:]
-                mcpCheckError[slug] = error.message
+            let results = await McpStatusChecker.check(root: workspace.root, agents: agents)
+            var health: [AgentKind: [String: McpHealth]] = [:]
+            var errors: [AgentKind: String] = [:]
+            for kind in agents {
+                switch results[kind] {
+                case .success(let found)?:
+                    health[kind] = Dictionary(uniqueKeysWithValues: names.map { ($0, found[$0] ?? .unknown) })
+                case .failure(let error)?:
+                    errors[kind] = error.message
+                case nil:
+                    break
+                }
             }
+            mcpHealth[slug] = health
+            mcpCheckError[slug] = errors
         }
     }
 
-    func health(of server: String, in workspace: Workspace) -> McpHealth? {
-        mcpHealth[workspace.id]?[server]
+    /// The server's health with each enabled agent, in the agents' order.
+    func health(of server: String, in workspace: Workspace) -> [(agent: AgentKind, health: McpHealth)] {
+        let byAgent = mcpHealth[workspace.id] ?? [:]
+        return AgentSettings.shared.enabled.compactMap { kind in byAgent[kind]?[server].map { (kind, $0) } }
     }
 }

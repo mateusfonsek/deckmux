@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import Combine
 import DeckmuxCaffeine
 import DeckmuxMonitor
@@ -210,20 +211,25 @@ final class CaffeineController: ObservableObject {
     }
 
     /// The chats that count as working right now.
+    #if DEBUG
+    /// The chats the café would keep the Mac awake for, for automated checks.
+    var debugWorkingChats: [String] { chats().map { "\($0.name):\($0.work)" } }
+    #endif
+
     private func chats() -> [CaffeineChat] {
         let now = Date()
         var found: [CaffeineChat] = []
         for item in deck.items {
             let layout = item.layout
             let color = deck.workspace(of: item)?.color
-            for (id, _) in layout.claudeSessions {
+            for (id, session) in layout.agentSessions {
                 let surface = layout.terminal(withID: id)
                 var needsInput = false
                 if case .needsInput = layout.attention[id] { needsInput = true }
-                let work = WorkRule.work(titleWorking: surface.map(TerminalLabel.isWorking) ?? false,
+                let work = WorkRule.work(titleWorking: AgentWork.isWorking(terminal: id, in: layout),
                                          needsInput: needsInput, subagents: subagents[id] ?? [], now: now)
                 guard work != .idle else { continue }
-                let name = TerminalLabel.plainName(pwd: surface?.pwd, title: surface?.title ?? "", runsClaude: true)
+                let name = TerminalLabel.plainName(pwd: surface?.pwd, title: surface?.title ?? "", agent: session.agent)
                 found.append(CaffeineChat(id: id, itemID: item.id, name: name, color: color, work: work))
             }
         }
@@ -233,7 +239,7 @@ final class CaffeineController: ObservableObject {
     private func watchSubagents() {
         var sessions: [(terminal: UUID, cwd: String, sessionID: String)] = []
         for item in deck.items {
-            for (id, session) in item.layout.claudeSessions {
+            for (id, session) in item.layout.agentSessions where AgentRegistry.provider(for: session.agent).keepsSubagentTranscripts {
                 guard let cwd = session.directory ?? item.layout.terminal(withID: id)?.pwd else { continue }
                 sessions.append((id, cwd, session.sessionID))
             }
@@ -260,7 +266,7 @@ final class CaffeineController: ObservableObject {
     private func markTabs(_ terminals: Set<UUID>) {
         guard terminals != markedTabs else { return }
         for item in deck.items {
-            for (id, _) in item.layout.claudeSessions where terminals.contains(id) != markedTabs.contains(id) {
+            for (id, _) in item.layout.agentSessions where terminals.contains(id) != markedTabs.contains(id) {
                 item.layout.setCaffeine(terminals.contains(id), forTerminal: id)
             }
         }

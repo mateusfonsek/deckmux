@@ -3,7 +3,7 @@ import Foundation
 /// A JSON value that keeps object key order and the exact text of numbers,
 /// so Deckmux can change one key of a file it does not own (Claude Code's
 /// settings, `~/.claude.json`) and write everything else back untouched.
-indirect enum JSONValue: Equatable {
+public indirect enum JSONValue: Equatable {
     case object([(key: String, value: JSONValue)])
     case array([JSONValue])
     case string(String)
@@ -12,7 +12,7 @@ indirect enum JSONValue: Equatable {
     case bool(Bool)
     case null
 
-    static func == (lhs: JSONValue, rhs: JSONValue) -> Bool {
+    public static func == (lhs: JSONValue, rhs: JSONValue) -> Bool {
         switch (lhs, rhs) {
         case (.object(let a), .object(let b)):
             a.count == b.count && zip(a, b).allSatisfy { $0.key == $1.key && $0.value == $1.value }
@@ -27,27 +27,27 @@ indirect enum JSONValue: Equatable {
 
     // MARK: Reading
 
-    subscript(key: String) -> JSONValue? {
+    public subscript(key: String) -> JSONValue? {
         guard case .object(let members) = self else { return nil }
         return members.first { $0.key == key }?.value
     }
 
-    var stringValue: String? {
+    public var stringValue: String? {
         if case .string(let value) = self { return value }
         return nil
     }
 
-    var boolValue: Bool? {
+    public var boolValue: Bool? {
         if case .bool(let value) = self { return value }
         return nil
     }
 
-    var arrayValue: [JSONValue]? {
+    public var arrayValue: [JSONValue]? {
         if case .array(let value) = self { return value }
         return nil
     }
 
-    var objectMembers: [(key: String, value: JSONValue)]? {
+    public var objectMembers: [(key: String, value: JSONValue)]? {
         if case .object(let value) = self { return value }
         return nil
     }
@@ -56,7 +56,7 @@ indirect enum JSONValue: Equatable {
 
     /// Sets `key`, keeping its position when it exists and appending it
     /// otherwise. `nil` removes the key. Only valid on objects.
-    mutating func set(_ key: String, _ value: JSONValue?) {
+    public mutating func set(_ key: String, _ value: JSONValue?) {
         guard case .object(var members) = self else { return }
         if let index = members.firstIndex(where: { $0.key == key }) {
             if let value { members[index].value = value } else { members.remove(at: index) }
@@ -68,7 +68,7 @@ indirect enum JSONValue: Equatable {
 
     /// Changes the value at `path` (object keys), creating missing objects on
     /// the way. Returning nil from `change` removes the key.
-    mutating func update(_ path: [String], _ change: (JSONValue?) -> JSONValue?) {
+    public mutating func update(_ path: [String], _ change: (JSONValue?) -> JSONValue?) {
         guard let key = path.first else {
             self = change(self) ?? .null
             return
@@ -86,14 +86,14 @@ indirect enum JSONValue: Equatable {
     // MARK: Text
 
     /// Parses JSON text. Throws on anything that is not a single JSON value.
-    init(parsing text: String) throws {
+    public init(parsing text: String) throws {
         var parser = Parser(Array(text.unicodeScalars))
         self = try parser.parseDocument()
     }
 
     /// The text `JSON.stringify(value, null, 2)` would produce, which is how
     /// Claude Code writes its files, followed by a newline when asked.
-    func formatted(trailingNewline: Bool = true) -> String {
+    public func formatted(trailingNewline: Bool = true) -> String {
         var out = ""
         write(into: &out, indent: 0)
         return trailingNewline ? out + "\n" : out
@@ -130,7 +130,7 @@ indirect enum JSONValue: Equatable {
 
     /// JSON.stringify's escaping: quotes, backslashes and control characters;
     /// everything else, including non-ASCII and "/", stays as is.
-    static func quoted(_ text: String) -> String {
+    public static func quoted(_ text: String) -> String {
         var out = "\""
         for scalar in text.unicodeScalars {
             switch scalar {
@@ -153,10 +153,10 @@ indirect enum JSONValue: Equatable {
     }
 }
 
-struct JSONParseError: Error, LocalizedError {
-    let message: String
-    let offset: Int
-    var errorDescription: String? { "JSON inválido (posição \(offset)): \(message)" }
+public struct JSONParseError: Error, LocalizedError {
+    public let message: String
+    public let offset: Int
+    public var errorDescription: String? { "JSON inválido (posição \(offset)): \(message)" }
 }
 
 private struct Parser {
@@ -290,5 +290,30 @@ private struct Parser {
         let raw = String(String.UnicodeScalarView(scalars[start..<index]))
         guard Double(raw) != nil else { throw error("número inválido") }
         return .number(raw)
+    }
+}
+
+
+/// Edits one JSON file through `JSONValue`, keeping everything it does not
+/// change. A missing file starts as `{}`.
+public enum JSONEdit {
+    public static func edit(_ text: String?, _ change: (inout JSONValue) throws -> Void) throws -> String {
+        var value = try text.map { try JSONValue(parsing: $0) } ?? .object([])
+        try change(&value)
+        return value.formatted(trailingNewline: text?.hasSuffix("\n") ?? true)
+    }
+
+    /// Adds or removes names in a JSON array of strings at `path`, keeping
+    /// the order of the others. An array left empty is removed.
+    public static func setNames(_ names: [String], present: Bool, at path: [String], in value: inout JSONValue) {
+        value.update(path) { current in
+            var items = current?.arrayValue ?? []
+            for name in names {
+                let exists = items.contains { $0.stringValue == name }
+                if present, !exists { items.append(.string(name)) }
+                if !present { items.removeAll { $0.stringValue == name } }
+            }
+            return items.isEmpty ? nil : .array(items)
+        }
     }
 }

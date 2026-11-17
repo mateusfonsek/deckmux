@@ -1,6 +1,7 @@
 import AppKit
 import Bonsplit
 import Combine
+import DeckmuxAgents
 import DeckmuxChat
 import SwiftUI
 
@@ -20,15 +21,23 @@ final class DeckItem: ObservableObject, Identifiable {
     /// whole sidebar and Hoje each time. What the UI shows (name, working,
     /// branch) is derived and published only when it actually changes.
     private(set) var title: String = ""
-    /// Some terminal here has Claude Code waiting for the user.
+    /// Some terminal here has an agent waiting for the user.
     @Published private(set) var needsAttention = false
     /// The most urgent bell here (a question beats "finished") and its terminal.
     @Published private(set) var attention: (terminal: UUID, kind: AgentAttention)?
-    /// Some terminal here is running Claude Code.
-    @Published private(set) var runsClaude = false
+    /// The agent the sidebar shows: the focused terminal's, else one that
+    /// runs in another terminal here; nil when none runs.
+    @Published private(set) var runningAgent: AgentKind?
+    /// The focused terminal's agent.
+    private var focusedAgent: AgentKind? {
+        didSet { updateRunningAgent() }
+    }
+    private var anyAgent: AgentKind? {
+        didSet { updateRunningAgent() }
+    }
     /// The sidebar label: the user's name for the item, else the automatic one.
     @Published private(set) var displayName = "~"
-    /// The focused terminal's conversation while Claude Code runs there,
+    /// The focused terminal's conversation while an agent names it there,
     /// otherwise its folder.
     private(set) var automaticName = "~" {
         didSet { updateDisplayName() }
@@ -39,8 +48,8 @@ final class DeckItem: ObservableObject, Identifiable {
     }
     /// The focused tab is a code tab: the sidebar shows its ‹/› icon.
     @Published private(set) var showsCode = false
-    /// Claude Code is working (its title starts with a spinner, not ✳).
-    @Published private(set) var claudeWorking = false
+    /// The focused terminal's agent is working.
+    @Published private(set) var agentWorking = false
     /// The git branch of the focused terminal's folder, if it is in a repo.
     @Published private(set) var branch: String?
 
@@ -48,7 +57,7 @@ final class DeckItem: ObservableObject, Identifiable {
     private var branchFolder: String?
     private var branchCheckedAt = Date.distantPast
     private var attentionObservation: AnyCancellable?
-    private var claudeObservation: AnyCancellable?
+    private var agentObservation: AnyCancellable?
 
     init(ghostty: Ghostty.App, initialConfig: Ghostty.SurfaceConfiguration?, restoring saved: SessionSnapshot.Item? = nil) {
         id = saved?.id ?? UUID()
@@ -82,9 +91,13 @@ final class DeckItem: ObservableObject, Identifiable {
                 guard let surface = last?.value ?? self?.layout.focusedSurface else {
                     return Just(nil).eraseToAnyPublisher()
                 }
-                return surface.$pwd.combineLatest(surface.$title, layout.$claudeSessions.map { $0[surface.id] != nil },
+                let id = surface.id
+                let agent = layout.$agentSessions.combineLatest(layout.$agentTurns)
+                    .map { sessions, turns in AgentState(agent: sessions[id]?.agent, turnOpen: turns.contains(id)) }
+                    .removeDuplicates()
+                return surface.$pwd.combineLatest(surface.$title, agent,
                                                   surface.$programStates.map { $0.values.contains(.working) }.removeDuplicates())
-                    .map { FocusedTerminal(pwd: $0, title: $1, runsClaude: $2, reportsWorking: $3) }
+                    .map { FocusedTerminal(pwd: $0, title: $1, agent: $2.agent, turnOpen: $2.turnOpen, reportsWorking: $3) }
                     .eraseToAnyPublisher()
             }
             .switchToLatest()
@@ -94,30 +107,33 @@ final class DeckItem: ObservableObject, Identifiable {
                 guard let self else { return }
                 if (codeRoot != nil) != self.showsCode { self.showsCode = codeRoot != nil }
                 // With a code tab focused the folder, name and branch are its
-                // root's; Claude in the last focused terminal (the split next
-                // to it) still shows as working.
+                // root's; the agent in the last focused terminal (the split
+                // next to it) still shows as working.
                 if let terminal {
                     if terminal.title != self.title { self.title = terminal.title }
-                    let working = terminal.runsClaude && (terminal.reportsWorking || TerminalLabel.isWorking(terminal.title))
-                    if working != self.claudeWorking { self.claudeWorking = working }
-                } else if codeRoot != nil, self.claudeWorking {
-                    self.claudeWorking = false
+                    if terminal.agent != self.focusedAgent { self.focusedAgent = terminal.agent }
+                    let working = terminal.agent.map {
+                        AgentWork.isWorking(agent: $0, reportsWorking: terminal.reportsWorking, title: terminal.title, turnOpen: terminal.turnOpen)
+                    } ?? false
+                    if working != self.agentWorking { self.agentWorking = working }
+                } else if codeRoot != nil, self.agentWorking {
+                    self.agentWorking = false
                 }
                 if let codeRoot {
                     self.showFolder(codeRoot)
                     return
                 }
                 guard let terminal else { return }
-                let (pwd, title, runsClaude) = (terminal.pwd, terminal.title, terminal.runsClaude)
+                let (pwd, title, agent) = (terminal.pwd, terminal.title, terminal.agent)
                 if let pwd, pwd != self.directory { self.directory = pwd }
-                let name = TerminalLabel.plainName(pwd: pwd ?? self.directory, title: title, runsClaude: runsClaude)
+                let name = TerminalLabel.plainName(pwd: pwd ?? self.directory, title: title, agent: agent)
                 if name != self.automaticName { self.automaticName = name }
                 self.updateBranch(in: pwd ?? self.directory)
             }
-        claudeObservation = layout.$claudeSessions
-            .map { !$0.isEmpty }
+        agentObservation = layout.$agentSessions
+            .map { sessions in AgentKind.allCases.first { kind in sessions.values.contains { $0.agent == kind } } }
             .removeDuplicates()
-            .sink { [weak self] value in self?.runsClaude = value }
+            .sink { [weak self] value in self?.anyAgent = value }
         attentionObservation = layout.$attention
             .sink { [weak self] bells in
                 guard let self else { return }
@@ -131,6 +147,11 @@ final class DeckItem: ObservableObject, Identifiable {
         .init(id: id, layout: layout.snapshot(), focusedTerminal: layout.focusedTabRecordID, customization: customization)
     }
 
+    private func updateRunningAgent() {
+        let agent = focusedAgent ?? anyAgent
+        if agent != runningAgent { runningAgent = agent }
+    }
+
     private func updateDisplayName() {
         let name = customization.displayName(automatic: automaticName)
         if name != displayName { displayName = name }
@@ -139,8 +160,14 @@ final class DeckItem: ObservableObject, Identifiable {
     private struct FocusedTerminal {
         var pwd: String?
         var title: String
-        var runsClaude: Bool
+        var agent: AgentKind?
+        var turnOpen: Bool
         var reportsWorking: Bool
+    }
+
+    private struct AgentState: Equatable {
+        var agent: AgentKind?
+        var turnOpen: Bool
     }
 
     /// A code tab has focus: the item's folder is its root.

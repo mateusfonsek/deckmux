@@ -1,3 +1,4 @@
+import DeckmuxAgents
 import Foundation
 
 enum TerminalLabel {
@@ -10,19 +11,24 @@ enum TerminalLabel {
         return standardized == NSHomeDirectory() ? "~" : (standardized as NSString).lastPathComponent
     }
 
-    /// A tab's name. While Claude Code runs in the terminal it is the title
-    /// Claude gives the conversation, as in cmux ("✳ Ajustar o login", with a
-    /// spinner in front while it works); otherwise the folder name.
-    static func tabName(pwd: String?, title: String, runsClaude: Bool) -> String {
-        if runsClaude, let session = claudeTitle(title) { return session }
+    /// A tab's name. While an agent that names its conversation in the
+    /// title (Claude Code) runs in the terminal it is that title, as in cmux
+    /// ("✳ Ajustar o login", with a spinner in front while it works);
+    /// otherwise the folder name.
+    static func tabName(pwd: String?, title: String, agent: AgentKind?) -> String {
+        if usesTitle(agent), let session = claudeTitle(title) { return session }
         return folderName(pwd)
     }
 
-    /// Claude Code's title without the status glyph in front, for places
-    /// that show their own Claude symbol (the sidebar).
-    static func plainName(pwd: String?, title: String, runsClaude: Bool) -> String {
-        guard runsClaude, let session = claudeTitle(title) else { return folderName(pwd) }
+    /// The agent's title without the status glyph in front, for places that
+    /// show their own agent symbol (the sidebar).
+    static func plainName(pwd: String?, title: String, agent: AgentKind?) -> String {
+        guard usesTitle(agent), let session = claudeTitle(title) else { return folderName(pwd) }
         return withoutStatusGlyph(session)
+    }
+
+    private static func usesTitle(_ agent: AgentKind?) -> Bool {
+        agent.map { AgentRegistry.provider(for: $0).workSignal == .terminalTitle } ?? false
     }
 
     private static func claudeTitle(_ title: String) -> String? {

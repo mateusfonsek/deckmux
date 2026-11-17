@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import DeckmuxMonitor
 import SwiftUI
 
@@ -38,8 +39,13 @@ struct MonitorView: View {
                 .padding(.bottom, 6)
                 Divider().opacity(0.6)
             }
-            UsageFooter(usage: model.usage, problem: model.usageProblem, thin: false)
-                .padding(.top, model.sessions.isEmpty ? 0 : 8)
+            VStack(alignment: .leading, spacing: 6) {
+                if model.usageAgents.count > 1, let current = model.usageAgent {
+                    UsagePicker(current: current, agents: model.usageAgents) { model.onChooseUsage?($0) }
+                }
+                UsageFooter(usage: model.usage, problem: model.usageProblem, thin: false)
+            }
+            .padding(.top, model.sessions.isEmpty ? 0 : 8)
         }
         .padding(10)
         .frame(width: Self.width, alignment: .leading)
@@ -115,6 +121,9 @@ private struct SessionBlock: View {
                             .font(.system(size: 12.5, weight: .medium))
                             .lineLimit(1)
                             .truncationMode(.tail)
+                        // Which agent runs there, in its own color.
+                        AgentMark(agent: session.agent, working: false, size: 11)
+                            .help(AgentRegistry.provider(for: session.agent).displayName)
                     }
                     TimelineView(.periodic(from: .now, by: 30)) { context in
                         Text(MonitorModel.stateText(session, now: context.date))
@@ -213,6 +222,40 @@ struct PulseView: View {
         case .idle?: Color.primary.opacity(0.3)
         case nil: Color.primary.opacity(0.12)
         }
+    }
+}
+
+/// "Uso do Claude ▾": whose limits the footer shows, when several agents are on.
+struct UsagePicker: View {
+    let current: AgentKind
+    let agents: [AgentKind]
+    let choose: (AgentKind) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(agents, id: \.self) { kind in
+                Button {
+                    choose(kind)
+                } label: {
+                    if kind == current {
+                        Label(AgentRegistry.provider(for: kind).displayName, systemImage: "checkmark")
+                    } else {
+                        Text(AgentRegistry.provider(for: kind).displayName)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text("Uso do \(AgentRegistry.provider(for: current).displayName)")
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Trocar a IA do uso")
     }
 }
 

@@ -18,6 +18,9 @@ enum ConfigPaths {
     static var googleCredentials: URL { home.appendingPathComponent(".config/google-workspace-mcp", isDirectory: true) }
     static var mcpAccounts: URL { home.appendingPathComponent(".config/claude-statusline/mcp-accounts.json") }
 
+    /// A path under the home folder, given from it (".codex/hooks.json").
+    static func inHome(_ relative: String) -> URL { home.appendingPathComponent(relative) }
+
     static func theme(slug: String) -> URL { claudeThemes.appendingPathComponent("\(slug).json") }
     static func googleFolder(slug: String) -> URL { googleCredentials.appendingPathComponent(slug, isDirectory: true) }
 

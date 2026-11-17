@@ -174,15 +174,3 @@ enum SessionStore {
         scrollbackDirectory.appendingPathComponent("\(id.uuidString).vt")
     }
 }
-
-/// User settings for restoring sessions.
-enum SessionSettings {
-    private static let resumeClaudeKey = "resumeClaudeSessions"
-
-    /// Whether a terminal that was running Claude Code reopens the same
-    /// conversation (`claude --resume <id>`). On by default.
-    static var resumesClaudeSessions: Bool {
-        get { UserDefaults.standard.object(forKey: resumeClaudeKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: resumeClaudeKey) }
-    }
-}

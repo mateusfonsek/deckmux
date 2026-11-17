@@ -1,7 +1,9 @@
+import DeckmuxAgents
 import SwiftUI
 
-/// Editor and rendered preview of the workspace's CLAUDE.md.
-struct ClaudeMdTab: View {
+/// Editor and rendered preview of the workspace's context: `CLAUDE.md`, or
+/// `AGENTS.md` when an agent that reads it is on (see `contextURL`).
+struct ContextTab: View {
     @ObservedObject var model: WorkspacesModel
     let workspace: Workspace
 
@@ -11,7 +13,9 @@ struct ClaudeMdTab: View {
     @State private var changedOnDisk = false
     @State private var watcher: FileWatcher?
 
-    private var url: URL { WorkspaceOperations.claudeMdURL(workspace.root) }
+    /// Recomputed after a migration or when agents are turned on or off.
+    @State private var url = URL(fileURLWithPath: "/")
+    @State private var needsMigration = false
     private var isDirty: Bool { text != (base ?? "") }
 
     enum Mode: String, CaseIterable, Identifiable {
@@ -52,9 +56,16 @@ struct ClaudeMdTab: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
 
+            if needsMigration {
+                Callout(kind: .info,
+                        text: "Codex e Kiro leem o AGENTS.md. Mova o texto do CLAUDE.md para lá e todas as IAs leem as mesmas regras; o CLAUDE.md passa a importá-lo.",
+                        action: (title: "Usar AGENTS.md para todas as IAs", run: { migrate() }))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+            }
             if changedOnDisk {
                 Callout(kind: .warning,
-                        text: isDirty ? "O CLAUDE.md mudou no disco. Recarregar descarta o que você editou aqui." : "O CLAUDE.md mudou no disco e foi recarregado.",
+                        text: isDirty ? "O \(url.lastPathComponent) mudou no disco. Recarregar descarta o que você editou aqui." : "O \(url.lastPathComponent) mudou no disco e foi recarregado.",
                         action: isDirty ? (title: "Recarregar", run: { load() }) : nil,
                         dismiss: { changedOnDisk = false })
                     .padding(.horizontal, 20)
@@ -87,19 +98,26 @@ struct ClaudeMdTab: View {
             }
 
             if isDirty {
-                UnsavedBar(message: "CLAUDE.md com alterações", saveTitle: "Salvar…", canSave: true,
+                UnsavedBar(message: "\(url.lastPathComponent) com alterações", saveTitle: "Salvar…", canSave: true,
                            discard: { text = base ?? "" }, save: save)
             }
         }
         .animation(.easeOut(duration: 0.15), value: isDirty)
-        .onAppear {
-            load()
-            watcher = FileWatcher(url: url) { checkDisk() }
-        }
+        .onAppear { load() }
+        .onReceive(NotificationCenter.default.publisher(for: AgentSettings.didChange)) { _ in if !isDirty { load() } }
         .onDisappear { watcher = nil }
     }
 
+    private func migrate() {
+        model.propose(ChangeSet(title: "Usar AGENTS.md em \(workspace.name)",
+                                changes: WorkspaceOperations.contextMigrationChanges(workspace.root)),
+                      applyTitle: "Mover") { load() }
+    }
+
     private func load() {
+        url = WorkspaceOperations.contextURL(workspace.root)
+        needsMigration = WorkspaceOperations.needsContextMigration(workspace.root)
+        watcher = FileWatcher(url: url) { checkDisk() }
         let current = try? String(contentsOf: url, encoding: .utf8)
         base = current
         text = current ?? ""
@@ -119,7 +137,7 @@ struct ClaudeMdTab: View {
 
     private func save() {
         let saved = text
-        model.propose(model.operations.saveClaudeMd(workspace, text: saved)) {
+        model.propose(model.operations.saveContext(workspace, text: saved)) {
             base = saved
             changedOnDisk = false
         }

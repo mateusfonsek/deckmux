@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import DeckmuxCalendar
 import DeckmuxTasks
 import SwiftUI
@@ -48,15 +49,18 @@ enum PaletteEntries {
                 id: "item-\(item.id)", section: .items, title: item.displayName,
                 subtitle: [workspace?.name, item.branch, item.directory.map { ConfigPaths.display(URL(fileURLWithPath: $0)) }]
                     .compactMap { $0 }.joined(separator: " · "),
-                icon: item.runsClaude ? "sparkle" : "terminal.fill", color: item.runsClaude ? Theme.claude : workspace?.color,
+                icon: item.runningAgent != nil ? "sparkle" : "terminal.fill",
+                color: item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).mark.colorHex).map(Color.init) } ?? workspace?.color,
                 shortcut: shortcuts[item.id].map { "⌘\($0)" },
                 keywords: item.attention != nil ? "esperando atencao" : ""
             ) { deck.select(item) })
         }
         entries.append(PaletteEntry(id: "page-today", section: .pages, title: "Hoje", subtitle: "Agenda e tarefas",
                                     icon: "sun.max", shortcut: "⌘0", keywords: "home agenda inicio") { deck.show(.today) })
-        entries.append(PaletteEntry(id: "page-workspaces", section: .pages, title: "Workspaces", subtitle: "Nome, cor, CLAUDE.md e MCPs",
+        entries.append(PaletteEntry(id: "page-workspaces", section: .pages, title: "Workspaces", subtitle: "Nome, cor, contexto e MCPs",
                                     icon: "square.stack.3d.up", keywords: "configuracoes ajustes mcp") { deck.showWorkspacesTab() })
+        entries.append(PaletteEntry(id: "page-settings", section: .pages, title: "Ajustes", subtitle: "IAs que você usa",
+                                    icon: "gearshape", shortcut: "⌘,", keywords: "configuracoes preferencias settings ia codex kiro claude") { deck.showSettings() })
         entries.append(PaletteEntry(id: "page-task-manager", section: .pages, title: "Gerenciador de tarefas", subtitle: "Processos, CPU e memória",
                                     icon: "cpu", keywords: "task manager processos cpu memoria consumo encerrar") {
             TaskManagerWindowController.shared?.show()
@@ -87,6 +91,20 @@ enum PaletteEntries {
         }
         entries.append(PaletteEntry(id: "new-terminal", section: .actions, title: "Novo terminal", subtitle: "Sem workspace",
                                     icon: "plus") { deck.addOutsideWorkspaces() })
+        for kind in AgentSettings.shared.enabled {
+            let provider = AgentRegistry.provider(for: kind)
+            entries.append(PaletteEntry(id: "new-agent-\(kind.rawValue)", section: .actions, title: "Novo terminal com \(provider.displayName)",
+                                        subtitle: TerminalLabel.folderName(deck.selected?.directory), icon: "sparkle",
+                                        color: NSColor(hex: provider.mark.colorHex).map(Color.init), keywords: "ia agente \(provider.executable)") {
+                if let item = deck.selected {
+                    item.layout.openAgent(kind, inPane: item.layout.bonsplit.focusedPaneId)
+                } else {
+                    var config = Ghostty.SurfaceConfiguration()
+                    config.initialInput = provider.launchCommand()
+                    AgentSetup.whenInstalled(kind) { deck.add(config: config) }
+                }
+            })
+        }
         for workspace in deck.workspaces.workspaces {
             entries.append(PaletteEntry(id: "new-terminal-\(workspace.id)", section: .actions, title: "Novo terminal em \(workspace.name)",
                                         icon: "plus", color: workspace.color, keywords: "abrir") { deck.add(in: workspace) })

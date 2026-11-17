@@ -1,6 +1,7 @@
 import AppKit
 import Bonsplit
 import Combine
+import DeckmuxAgents
 import DeckmuxCode
 import GhosttyKit
 import SwiftUI
@@ -36,9 +37,15 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     @Published private(set) var focusedCodeRoot: String?
     private var titleObservers: [TabID: AnyCancellable] = [:]
     private var tintObservers: [TabID: AnyCancellable] = [:]
-    /// The Claude Code conversation each terminal runs, by terminal ID.
-    @Published private(set) var claudeSessions: [UUID: ClaudeSession] = [:]
-    /// Terminals whose Claude Code is waiting for the user, by terminal ID.
+    /// The agent conversation each terminal runs, by terminal ID.
+    @Published private(set) var agentSessions: [UUID: AgentSession] = [:]
+    /// Terminals whose agent has a turn open (agents that report work through
+    /// hooks: a prompt opens it, Stop closes it).
+    @Published private(set) var agentTurns: Set<UUID> = []
+    /// When each open turn last showed life (prompt or tool use).
+    private var turnActivity: [UUID: Date] = [:]
+    private var turnSweep: Timer?
+    /// Terminals whose agent is waiting for the user, by terminal ID.
     @Published private(set) var attention: [UUID: AgentAttention] = [:]
     /// When each bell in `attention` rang (the menu bar says "há 2 min").
     private(set) var attentionSince: [UUID: Date] = [:]
@@ -46,9 +53,14 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     /// do not move focus around.
     private var isRestoring = false
     private var configObserver: NSObjectProtocol?
+    private var commandObserver: NSObjectProtocol?
+    private var settingsObserver: NSObjectProtocol?
 
     deinit {
         configObserver.map(NotificationCenter.default.removeObserver)
+        turnSweep?.invalidate()
+        commandObserver.map(NotificationCenter.default.removeObserver)
+        settingsObserver.map(NotificationCenter.default.removeObserver)
     }
 
     /// Called once the last tab is gone, so the window can close.
@@ -65,7 +77,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
             contentViewLifecycle: .keepAllAlive,
             newTabPosition: .current
         )
-        configuration.appearance.splitButtons = [.newTerminal, Self.newClaudeButton, Self.codeButton, .splitRight, .splitDown]
+        configuration.appearance.splitButtons = Self.splitButtons()
         // Bigger than Bonsplit's default (30 pt, 11 pt text): read all day.
         configuration.appearance.tabBarHeight = Theme.tabBarHeight
         configuration.appearance.tabTitleFontSize = Theme.tabTitleSize
@@ -92,6 +104,15 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
             guard note.object == nil, let self else { return }
             self.portal.terminalBackground = NSColor(self.ghostty.config.backgroundColor)
                 .withAlphaComponent(self.ghostty.config.backgroundOpacity)
+        }
+        settingsObserver = NotificationCenter.default.addObserver(forName: AgentSettings.didChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.agentSettingsDidChange() }
+        }
+        commandObserver = NotificationCenter.default.addObserver(forName: .deckmuxCommandFinished, object: nil, queue: .main) { [weak self] note in
+            MainActor.assumeIsolated {
+                guard let self, let surface = note.object as? Ghostty.SurfaceView, self.contains(surface) else { return }
+                self.commandFinished(in: surface)
+            }
         }
         // Bonsplit seeds a "Welcome" tab; replace it with the first terminal,
         // or use it as a placeholder while a saved layout is rebuilt.
@@ -242,9 +263,9 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
                 let tab = TabID(uuid: uuid)
                 let record: SessionSnapshot.Terminal
                 if let surface = surfaces[tab] {
-                    record = .init(id: surface.id, directory: surface.pwd, claude: claudeSessions[surface.id])
+                    record = .init(id: surface.id, directory: surface.pwd, agent: agentSessions[surface.id])
                 } else if let viewer = viewers[tab] {
-                    record = .init(id: viewer.id, directory: viewer.root.path, claude: nil, kind: Self.codeTabKind, code: viewer.state)
+                    record = .init(id: viewer.id, directory: viewer.root.path, agent: nil, kind: Self.codeTabKind, code: viewer.state)
                 } else {
                     continue
                 }
@@ -281,7 +302,8 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         var leaves: [(PaneID, SessionSnapshot.Pane)] = []
         scaffold(saved, in: root, leaves: &leaves, placeholders: &placeholders)
 
-        let resumesClaude = SessionSettings.resumesClaudeSessions
+        let resumes = AgentSettings.shared.resumesConversations
+        let enabled = Set(AgentSettings.shared.enabled)
         for (pane, savedPane) in leaves {
             var selected: TabID?
             for terminal in savedPane.terminals {
@@ -293,9 +315,9 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
                     opened = openCode(root: URL(fileURLWithPath: root, isDirectory: true), inPane: pane,
                                       state: terminal.code, id: terminal.id, focus: false)
                 case nil:
-                    let claude = resumesClaude && terminal.claude?.hasTranscript != false ? terminal.claude : nil
-                    opened = addTab(config: restoredConfig(terminal, claude: claude), inPane: pane, id: terminal.id, focus: false)
-                    if opened != nil, let claude { claudeSessions[terminal.id] = claude }
+                    let session = resumes ? terminal.agent.flatMap { enabled.contains($0.agent) ? Self.resumable($0) : nil } : nil
+                    opened = addTab(config: restoredConfig(terminal, session: session), inPane: pane, id: terminal.id, focus: false)
+                    if opened != nil, let session { agentSessions[terminal.id] = session }
                 default:
                     // A kind this version does not know.
                     continue
@@ -340,20 +362,29 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     }
 
     /// A restored terminal opens in its folder, prints its saved scrollback
-    /// and, when it was running Claude Code, reopens the same conversation.
-    private func restoredConfig(_ terminal: SessionSnapshot.Terminal, claude: ClaudeSession?) -> Ghostty.SurfaceConfiguration {
+    /// and, when it was running an agent, reopens the same conversation.
+    private func restoredConfig(_ terminal: SessionSnapshot.Terminal, session: AgentSession?) -> Ghostty.SurfaceConfiguration {
         var config = Ghostty.SurfaceConfiguration()
-        let directory = claude?.directory ?? terminal.directory
+        let directory = session?.directory ?? terminal.directory
         if let directory, FileManager.default.fileExists(atPath: directory) {
             config.workingDirectory = directory
         }
         if let replay = SessionStore.scrollbackReplayFile(for: terminal.id) {
             config.environmentVariables["DECKMUX_RESTORE_SCROLLBACK_FILE"] = replay
         }
-        if let claude {
-            config.initialInput = "claude --resume \(AgentIntegration.shellQuoted(claude.sessionID))\n"
+        if let session {
+            config.initialInput = AgentRegistry.provider(for: session.agent).resumeCommand(sessionID: session.sessionID)
         }
         return config
+    }
+
+    /// A saved conversation worth resuming: one its agent saved (resuming
+    /// one closed before any message fails).
+    private static func resumable(_ session: AgentSession) -> AgentSession? {
+        let provider = AgentRegistry.provider(for: session.agent)
+        let saved = provider.hasTranscript(session, home: URL(fileURLWithPath: NSHomeDirectory()),
+                                           environment: ProcessInfo.processInfo.environment)
+        return saved == false ? nil : session
     }
 
     /// Makes the terminal saved as focused the active pane and tab; keyboard
@@ -369,14 +400,57 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         }
     }
 
-    // MARK: Claude Code
+    // MARK: Agents
 
     func terminal(withID id: UUID) -> Ghostty.SurfaceView? {
         surfaces.values.first { $0.id == id }
     }
 
-    func setClaudeSession(_ session: ClaudeSession?, forTerminal id: UUID) {
-        claudeSessions[id] = session
+    func setAgentSession(_ session: AgentSession?, forTerminal id: UUID) {
+        if agentSessions[id] != session { agentSessions[id] = session }
+        if session == nil { setTurn(false, forTerminal: id) }
+    }
+
+    func setTurn(_ open: Bool, forTerminal id: UUID) {
+        if open { turnActivity[id] = Date() } else { turnActivity[id] = nil }
+        guard agentTurns.contains(id) != open else { return }
+        if open { agentTurns.insert(id) } else { agentTurns.remove(id) }
+        updateTurnSweep()
+    }
+
+    /// The agent used a tool: its turn is alive.
+    func touchTurn(forTerminal id: UUID) {
+        guard agentTurns.contains(id) else { return }
+        turnActivity[id] = Date()
+    }
+
+    /// While some turn is open, closes the ones gone quiet for longer than
+    /// `TurnRule.staleTurn` (an interrupt that sent no Stop).
+    private func updateTurnSweep() {
+        if agentTurns.isEmpty {
+            turnSweep?.invalidate()
+            turnSweep = nil
+        } else if turnSweep == nil {
+            turnSweep = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.closeStaleTurns() }
+            }
+        }
+    }
+
+    private func closeStaleTurns() {
+        let now = Date()
+        for id in agentTurns where !TurnRule.isWorking(turnOpen: true, lastActivity: turnActivity[id], now: now) {
+            setTurn(false, forTerminal: id)
+        }
+    }
+
+    /// The shell got its prompt back: an agent that reports work through
+    /// hooks has exited (maybe without SessionEnd, after Ctrl-C).
+    func commandFinished(in surface: Ghostty.SurfaceView) {
+        let id = surface.id
+        guard let session = agentSessions[id],
+              AgentRegistry.provider(for: session.agent).workSignal == .hookTurns else { return }
+        setAgentSession(nil, forTerminal: id)
     }
 
     /// Marks or clears the bell on a terminal's tab.
@@ -607,7 +681,8 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
             }
         }
         if let surface = surfaces.removeValue(forKey: tab) {
-            claudeSessions.removeValue(forKey: surface.id)
+            agentSessions.removeValue(forKey: surface.id)
+            setTurn(false, forTerminal: surface.id)
             attention.removeValue(forKey: surface.id)
             attentionSince.removeValue(forKey: surface.id)
         }
@@ -636,12 +711,12 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
 
     /// Tabs are named after the terminal's folder, which the shell integration
     /// reports on every `cd` (Ghostty's title would show user@host first), or
-    /// after the conversation while Claude Code runs there.
+    /// after the conversation while an agent that names it in the title runs there.
     private func observeTitle(of surface: Ghostty.SurfaceView, tab: TabID) {
         let id = surface.id
         titleObservers[tab] = surface.$pwd
-            .combineLatest(surface.$title, $claudeSessions.map { $0[id] != nil }.removeDuplicates())
-            .map { pwd, title, runsClaude in TerminalLabel.tabName(pwd: pwd, title: title, runsClaude: runsClaude) }
+            .combineLatest(surface.$title, $agentSessions.map { $0[id]?.agent }.removeDuplicates())
+            .map { pwd, title, agent in TerminalLabel.tabName(pwd: pwd, title: title, agent: agent) }
             .removeDuplicates()
             // Claude Code's spinner changes the title ~10 times a second; four
             // redraws of the tab bar a second keep it moving at a fraction of the cost.
@@ -655,15 +730,49 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     }
 
     static let tabIcon = "terminal.fill"
-    /// Opens a terminal that starts Claude Code right away.
-    static let newClaudeButton = BonsplitConfiguration.SplitActionButton(
-        id: "newClaude", icon: .emoji("\u{2733}\u{FE0E}", scale: claudeMarkScale),
-        tooltip: "Novo terminal com Claude", action: .custom("newClaude"))
+    private static let agentButtonPrefix = "newAgent."
 
-    /// The sidebar's ✳ as text (U+FE0E keeps it from becoming the green
-    /// emoji), so Bonsplit paints it with the same gray as the other buttons.
-    /// Scaled from Bonsplit's 13 pt text so the glyph is as tall as its 12 pt symbols.
-    private static let claudeMarkScale = 1.2
+    /// Opens a terminal that starts the agent right away. Its glyph is text
+    /// (✳ with U+FE0E, so it does not become the green emoji), painted by
+    /// Bonsplit in the same gray as the other buttons and scaled to their height.
+    static func agentButton(_ kind: AgentKind) -> BonsplitConfiguration.SplitActionButton {
+        let provider = AgentRegistry.provider(for: kind)
+        return .init(id: agentButtonPrefix + kind.rawValue, icon: .emoji(provider.mark.glyph, scale: provider.mark.scale),
+                     tooltip: "Novo terminal com \(provider.displayName)", action: .custom(agentButtonPrefix + kind.rawValue))
+    }
+
+    /// One button per agent turned on in Ajustes, the default one first.
+    static func splitButtons(settings: AgentSettings = .shared) -> [BonsplitConfiguration.SplitActionButton] {
+        var agents = settings.enabled
+        if let first = settings.defaultAgent, let index = agents.firstIndex(of: first) {
+            agents.insert(agents.remove(at: index), at: 0)
+        }
+        return [.newTerminal] + agents.map(agentButton) + [codeButton, .splitRight, .splitDown]
+    }
+
+    /// Ajustes changed: the agent buttons follow, and conversations of agents
+    /// turned off stop counting (their terminals stay as they are).
+    private func agentSettingsDidChange() {
+        let buttons = Self.splitButtons()
+        if bonsplit.configuration.appearance.splitButtons != buttons {
+            bonsplit.configuration.appearance.splitButtons = buttons
+        }
+        let enabled = Set(AgentSettings.shared.enabled)
+        for (id, session) in agentSessions where !enabled.contains(session.agent) {
+            setAgentSession(nil, forTerminal: id)
+            setAttention(nil, forTerminal: id)
+        }
+    }
+
+    /// A new tab in `pane` that starts the agent, once its executable is found.
+    func openAgent(_ kind: AgentKind, inPane pane: PaneID?) {
+        var config = inheritedConfig(context: GHOSTTY_SURFACE_CONTEXT_TAB) ?? Ghostty.SurfaceConfiguration()
+        config.initialInput = AgentRegistry.provider(for: kind).launchCommand()
+        AgentSetup.whenInstalled(kind) { [weak self] in
+            guard let self, let pane = pane ?? self.bonsplit.focusedPaneId else { return }
+            self.addTab(config: config, inPane: pane)
+        }
+    }
     /// The color (#RRGGBB) of the workspace holding a folder; set by the window.
     static var workspaceColor: (String?) -> String? = { _ in nil }
 
@@ -679,7 +788,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         }
     }
 
-    func runsClaude(_ surface: Ghostty.SurfaceView) -> Bool { claudeSessions[surface.id] != nil }
+    func runningAgent(_ surface: Ghostty.SurfaceView) -> AgentKind? { agentSessions[surface.id]?.agent }
 
     // MARK: BonsplitDelegate
 
@@ -718,10 +827,9 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
 
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {
         switch identifier {
-        case Self.newClaudeButton.id:
-            var config = inheritedConfig(context: GHOSTTY_SURFACE_CONTEXT_TAB) ?? Ghostty.SurfaceConfiguration()
-            config.initialInput = "claude\n"
-            ClaudeCodeSetup.whenInstalled { [weak self] in self?.addTab(config: config, inPane: pane) }
+        case let id where id.hasPrefix(Self.agentButtonPrefix):
+            guard let kind = AgentKind(rawValue: String(id.dropFirst(Self.agentButtonPrefix.count))) else { break }
+            openAgent(kind, inPane: pane)
         case Self.codeButton.id:
             openCodeForFocusedFolder(inPane: pane)
         default:

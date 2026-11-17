@@ -1451,6 +1451,9 @@ extension Ghostty {
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
+                // Deckmux: the shell has its prompt back, so an agent run in it has exited.
+                NotificationCenter.default.post(name: .deckmuxCommandFinished, object: surfaceView)
+
                 // Determine if we even care about command finish notifications
                 guard let config = (NSApplication.shared.delegate as? AppDelegate)?.ghostty.config else { return }
                 switch config.notifyOnCommandFinish {

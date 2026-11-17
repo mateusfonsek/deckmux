@@ -1,4 +1,5 @@
 import AppKit
+import DeckmuxAgents
 import DeckmuxCalendar
 import SwiftUI
 
@@ -302,13 +303,13 @@ private struct AttentionChip: View {
 
     var body: some View {
         if let attention = item.attention {
-            Chip(help: "\(workspace.map { "\($0.name) · " } ?? "")\(item.displayName)\n\(TodayFormat.attention(attention.kind, full: true))\nClique para ir ao terminal") {
+            Chip(help: "\(workspace.map { "\($0.name) · " } ?? "")\(item.displayName)\n\(TodayFormat.attention(attention.kind, full: true, agent: item.runningAgent.map { AgentRegistry.provider(for: $0).displayName }))\nClique para ir ao terminal") {
                 deck.reveal(terminal: attention.terminal)
             } label: {
                 Image(systemName: "bell.fill").font(.system(size: 9)).foregroundStyle(.orange)
                 if let workspace { Circle().fill(workspace.color).frame(width: 6, height: 6) }
                 Text(item.displayName).lineLimit(1)
-                Text("· " + TodayFormat.attention(attention.kind, full: false)).foregroundStyle(.secondary).lineLimit(1)
+                Text("· " + TodayFormat.attention(attention.kind, full: false, agent: item.runningAgent.map { AgentRegistry.provider(for: $0).displayName })).foregroundStyle(.secondary).lineLimit(1)
             }
         }
     }
@@ -459,10 +460,12 @@ enum TodayFormat {
         return (meetings == 0 ? "Sem reuniões hoje. " : "") + "Livre: " + ranges.joined(separator: " · ")
     }
 
-    static func attention(_ kind: AgentAttention, full: Bool) -> String {
+    /// `agent`: the agent's name ("Codex"), or nil for a generic "IA".
+    static func attention(_ kind: AgentAttention, full: Bool, agent: String? = nil) -> String {
+        let name = agent ?? "IA"
         switch kind {
-        case .finished: return "Claude terminou"
-        case .needsInput(let detail): return full ? (detail ?? "Claude precisa de você") : "esperando você"
+        case .finished: return "\(name) terminou"
+        case .needsInput(let detail): return full ? (detail ?? "\(name) precisa de você") : "esperando você"
         }
     }
 }

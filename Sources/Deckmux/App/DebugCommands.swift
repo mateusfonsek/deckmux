@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import DeckmuxAgents
 import SwiftUI
 import UserNotifications
 
@@ -11,11 +12,22 @@ import UserNotifications
 /// - `type <text>` / `enter` type into the selected item's focused terminal.
 /// - `appearance light|dark` switches the app's appearance.
 /// - `notes` prints the delivered notifications.
+/// - `settings` opens Ajustes; `enable <agent> on|off` turns an agent on or off
+///   as the Ajustes toggle does.
+/// - `button <id>` runs a tab-bar button's action in the selected item, as a
+///   click on it does (e.g. `button newAgent.claude`).
+/// - `mcp-sync <folder>` reviews writing <folder>'s `.mcp.json` servers into
+///   the enabled agents' files (apply with `review apply`); `mcp-check <folder>`
+///   prints each enabled agent's health for them.
+/// - `state` prints each terminal's agent session, turn, working state and bell,
+///   and each sidebar item's agent.
 /// - `snap <dir>` writes every visible window, the café panel and the menu bar
 ///   face as PNGs into <dir> (rendered by the app, no screen recording needed).
 @MainActor
 enum DebugCommands {
     private static var observer: NSObjectProtocol?
+    /// The Janelinha: `janelinha on|off` switches it (without saving), `snap` renders it.
+    static weak var monitor: MonitorPanelController?
 
     static func start(window: MainWindowController) {
         setvbuf(stdout, nil, _IOLBF, 0)   // the log file gets each line as it comes
@@ -54,6 +66,73 @@ enum DebugCommands {
                 for note in notes { print("[debug] note \(note.request.identifier): \(note.request.content.body)") }
                 print("[debug] notes: \(notes.count)")
             }
+        case "settings": window.deck.showSettings()
+        case "enable":
+            let parts = rest.split(separator: " ").map(String.init)
+            if parts.count == 2, let kind = AgentKind(rawValue: parts[0]) {
+                let model = window.settingsModel
+                AgentActivation.request(kind, on: parts[1] == "on", settings: .shared, review: model.review) { model.notice = $0 }
+            }
+            print("[debug] enabled: \(AgentSettings.shared.enabled.map(\.rawValue))")
+        case "button":
+            if let layout = window.deck.selected?.layout {
+                layout.splitTabBar(layout.bonsplit, didRequestCustomAction: rest, inPane: layout.bonsplit.focusedPaneId ?? layout.bonsplit.allPaneIds[0])
+            }
+        case "review":
+            // Prints the pending review, or applies it with `review apply`.
+            if let pending = window.settingsModel.review.review {
+                let model = window.settingsModel.review
+                print("[debug] review: \(pending.set.title)")
+                for change in pending.set.changes {
+                    print("[debug]   \(change.url.path) \(change.summary)\n\(change.after ?? "<delete>")")
+                }
+                if rest == "apply" { model.apply(pending) }
+            } else {
+                print("[debug] review: none")
+            }
+        case "mcp-sync":
+            let root = URL(fileURLWithPath: rest)
+            let changes = WorkspaceOperations.agentMcpChanges(root: root, adding: WorkspaceOperations.mcpServers(in: root), removing: [])
+            window.settingsModel.review.propose(ChangeSet(title: "MCP sync", changes: changes))
+        case "context-migrate":
+            let root = URL(fileURLWithPath: rest)
+            print("[debug] context file: \(WorkspaceOperations.contextURL(root).lastPathComponent) migrate=\(WorkspaceOperations.needsContextMigration(root))")
+            window.settingsModel.review.propose(ChangeSet(title: "Context", changes: WorkspaceOperations.contextMigrationChanges(root)))
+        case "mcp-check":
+            let root = URL(fileURLWithPath: rest)
+            Task { @MainActor in
+                let results = await McpStatusChecker.check(root: root, agents: AgentSettings.shared.enabled)
+                for (kind, result) in results.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+                    switch result {
+                    case .success(let health): print("[debug] mcp \(kind.rawValue): \(health.sorted { $0.key < $1.key })")
+                    case .failure(let error): print("[debug] mcp \(kind.rawValue) failed: \(error.message)")
+                    }
+                }
+            }
+        case "workspace":
+            // `workspace <slug> <tab>`: shows the Workspaces screen on that workspace's tab (geral, claude, mcps).
+            let parts = rest.split(separator: " ").map(String.init)
+            window.deck.showWorkspacesTab()
+            if let slug = parts.first { window.workspacesModel.selectedSlug = slug }
+            if parts.count > 1, let tab = WorkspacesModel.DetailTab.allCases.first(where: { "\($0)" == parts[1] }) {
+                window.workspacesModel.detailTab = tab
+            }
+        case "janelinha": monitor?.setEnabled(rest == "on", preview: true)
+        case "usage":
+            if let kind = AgentKind(rawValue: rest) { AgentSettings.shared.usageAgent = kind }
+            print("[debug] usage agent: \(AgentSettings.shared.usageAgent?.rawValue ?? "-")")
+        case "buttons":
+            print("[debug] buttons: \(window.deck.selected?.layout.bonsplit.configuration.appearance.splitButtons.map(\.id) ?? [])")
+        case "state":
+            for item in window.deck.items {
+                let layout = item.layout
+                print("[debug] item \(item.displayName) agent=\(item.runningAgent?.rawValue ?? "-") working=\(item.agentWorking)")
+                for (id, session) in layout.agentSessions {
+                    print("[debug]   \(session.agent.rawValue) \(session.sessionID) turn=\(layout.agentTurns.contains(id)) working=\(AgentWork.isWorking(terminal: id, in: layout)) bell=\(String(describing: layout.attention[id]))")
+                }
+            }
+            print("[debug] status: \(AgentStatus.current(in: window.deck).label)")
+            print("[debug] cafe chats: \(window.caffeine.debugWorkingChats)")
         default: print("[debug] unknown command")
         }
     }
@@ -70,6 +149,12 @@ enum DebugCommands {
                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
             view.cacheDisplay(in: view.bounds, to: rep)
             write(rep, to: dir.appendingPathComponent("window-\(index).png"))
+        }
+        if let monitor, monitor.isEnabled {
+            let janelinha = ImageRenderer(content: MonitorView(model: monitor.model, collapsed: false, onReveal: { _ in }, onToggleCollapse: {})
+                .background(Color(nsColor: .windowBackgroundColor)))
+            janelinha.scale = 2
+            if let image = janelinha.nsImage { write(image, to: dir.appendingPathComponent("janelinha.png")) }
         }
         let panel = ImageRenderer(content: CaffeinePanel(caffeine: window.caffeine) {}
             .background(Color(nsColor: .windowBackgroundColor)))

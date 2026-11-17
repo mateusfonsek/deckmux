@@ -1,3 +1,4 @@
+import DeckmuxAgents
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -25,7 +26,7 @@ struct McpTab: View {
                 }
                 Spacer()
                 Button { model.refreshHealth(workspace) } label: { Label("Verificar", systemImage: "arrow.clockwise") }
-                    .help("Roda claude mcp list na raiz do workspace")
+                    .help("Roda o mcp list de cada IA ligada na raiz do workspace")
                 Button { showsCatalog = true } label: { Label("Adicionar MCP", systemImage: "plus") }
                     .buttonStyle(.borderedProminent)
             }
@@ -35,7 +36,7 @@ struct McpTab: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if let error = model.mcpCheckError[workspace.id] {
+                    ForEach(Array((model.mcpCheckError[workspace.id] ?? [:]).sorted { $0.key.rawValue < $1.key.rawValue }), id: \.key) { _, error in
                         Callout(kind: .warning, text: error)
                     }
                     if let authHint {
@@ -99,8 +100,10 @@ struct McpTab: View {
 
     @ViewBuilder private func row(_ name: String) -> some View {
         let kind = McpKind.of(serverName: name)
-        let health = model.health(of: name, in: workspace)
+        let byAgent = model.health(of: name, in: workspace)
+        let health = byAgent.first { $0.agent == .claude }?.health ?? byAgent.first?.health
         let account = McpAccounts.account(for: name, slug: workspace.id)
+        let needsLogin = byAgent.filter { $0.health == .needsLogin && AgentRegistry.provider(for: $0.agent).mcp?.loginCommand(server: name) != nil }
         HStack(alignment: .center, spacing: 14) {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(Color.primary.opacity(0.06))
@@ -109,10 +112,29 @@ struct McpTab: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text(name).font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    statusPill(health, account: account)
+                    if byAgent.count <= 1 {
+                        statusPill(health, account: account, agent: byAgent.first?.agent)
+                    }
                 }
-                if case .failed(let message)? = health, !message.isEmpty {
+                if byAgent.count > 1 {
+                    // One pill per agent turned on: each reads its own file.
+                    HStack(spacing: 6) {
+                        ForEach(byAgent, id: \.agent) { item in
+                            statusPill(item.health, account: item.agent == .claude ? account : nil, agent: item.agent, labeled: true)
+                        }
+                    }
+                }
+                ForEach(byAgent.compactMap { item -> String? in
+                    if case .failed(let message) = item.health, !message.isEmpty {
+                        return byAgent.count > 1 ? "\(AgentRegistry.provider(for: item.agent).displayName): \(message)" : message
+                    }
+                    return nil
+                }, id: \.self) { message in
                     Text(message).font(Theme.Font.caption).foregroundStyle(.red).textSelection(.enabled)
+                }
+                if byAgent.contains(where: { $0.agent == .codex && $0.health == .unknown }) {
+                    Text("Codex: abra o Codex nesta pasta e confie no projeto para ele ler .codex/config.toml.")
+                        .font(Theme.Font.caption).foregroundStyle(.secondary)
                 }
                 Text(description(name)).font(Theme.Font.caption).foregroundStyle(.tertiary)
                     .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
@@ -125,16 +147,32 @@ struct McpTab: View {
                 Button("Conectar conta Google") { connectGoogle(server: name) }
                     .buttonStyle(.borderedProminent)
                     .disabled(loginInProgress)
-            case .slack where health == .needsLogin, .clickup where health == .needsLogin:
-                Button("Fazer login") { authenticate(name) }
+            case _ where !needsLogin.isEmpty:
+                if needsLogin.count == 1, let agent = needsLogin.first?.agent {
+                    Button(byAgent.count > 1 ? "Fazer login no \(AgentRegistry.provider(for: agent).displayName)" : "Fazer login") {
+                        authenticate(name, agent: agent)
+                    }
                     .buttonStyle(.borderedProminent)
+                } else {
+                    Menu("Fazer login") {
+                        ForEach(needsLogin, id: \.agent) { item in
+                            Button("No \(AgentRegistry.provider(for: item.agent).displayName)") { authenticate(name, agent: item.agent) }
+                        }
+                    }
+                    .fixedSize()
+                }
             default:
                 EmptyView()
             }
             Menu {
                 switch kind {
                 case .google: Button("Trocar conta Google…") { connectGoogle(server: name) }.disabled(loginInProgress)
-                case .slack, .clickup: Button("Autenticar de novo…") { authenticate(name) }
+                case .slack, .clickup:
+                    ForEach(AgentSettings.shared.enabled.filter { AgentRegistry.provider(for: $0).mcp?.loginCommand(server: name) != nil }, id: \.self) { agent in
+                        Button(AgentSettings.shared.enabled.count > 1 ? "Autenticar de novo no \(AgentRegistry.provider(for: agent).displayName)…" : "Autenticar de novo…") {
+                            authenticate(name, agent: agent)
+                        }
+                    }
                 case .custom: EmptyView()
                 }
                 if kind != .custom { Divider() }
@@ -161,13 +199,18 @@ struct McpTab: View {
         }
     }
 
-    @ViewBuilder private func statusPill(_ health: McpHealth?, account: String?) -> some View {
+    /// `labeled`: the agent's name goes in front ("Codex: Configurado"),
+    /// when several agents are on.
+    @ViewBuilder private func statusPill(_ health: McpHealth?, account: String?, agent: AgentKind?, labeled: Bool = false) -> some View {
+        let name = agent.map { AgentRegistry.provider(for: $0).displayName } ?? "IA"
+        let prefix = labeled ? "\(name): " : ""
         switch health {
-        case .connected: StatusPill(text: account.map { "Conectado · \($0)" } ?? "Conectado", color: .green, icon: "checkmark")
-        case .needsLogin: StatusPill(text: "Precisa de login", color: .orange, icon: "exclamationmark")
-        case .failed: StatusPill(text: "Erro", color: .red, icon: "xmark")
-        case .checking: HStack(spacing: 5) { ProgressView().controlSize(.mini); Text("Verificando…").font(Theme.Font.caption).foregroundStyle(.secondary) }
-        case .unknown: StatusPill(text: "Não listado pelo Claude Code", color: .secondary)
+        case .connected: StatusPill(text: prefix + (account.map { "Conectado · \($0)" } ?? "Conectado"), color: .green, icon: "checkmark")
+        case .configured: StatusPill(text: prefix + "Configurado", color: .green, icon: "checkmark")
+        case .needsLogin: StatusPill(text: prefix + "Precisa de login", color: .orange, icon: "exclamationmark")
+        case .failed: StatusPill(text: prefix + "Erro", color: .red, icon: "xmark")
+        case .checking: HStack(spacing: 5) { ProgressView().controlSize(.mini); Text(prefix + "Verificando…").font(Theme.Font.caption).foregroundStyle(.secondary) }
+        case .unknown: StatusPill(text: labeled ? prefix + "Não listado" : "Não listado pelo \(name)", color: .secondary)
         case nil: if let account { StatusPill(text: account, color: .secondary) }
         }
     }
@@ -180,10 +223,14 @@ struct McpTab: View {
         return ([command] + args).joined(separator: " ")
     }
 
-    /// Slack and ClickUp log in through Claude Code's own /mcp screen.
-    private func authenticate(_ name: String) {
-        authHint = "Abri o /mcp do Claude num terminal em \(workspace.name): escolha \(name) → Authenticate e faça o login no navegador com a conta da \(workspace.name). Depois volte aqui e clique em Verificar."
-        ClaudeCodeSetup.whenInstalled { [model, workspace] in model.openTerminal?(workspace.root, "claude '/mcp'\n") }
+    /// Slack and ClickUp log in through the agent: Claude Code's /mcp
+    /// screen, `codex mcp login <name>`.
+    private func authenticate(_ name: String, agent: AgentKind) {
+        guard let command = AgentRegistry.provider(for: agent).mcp?.loginCommand(server: name) else { return }
+        authHint = agent == .claude
+            ? "Abri o /mcp do Claude num terminal em \(workspace.name): escolha \(name) → Authenticate e faça o login no navegador com a conta da \(workspace.name). Depois volte aqui e clique em Verificar."
+            : "Abri o login do \(AgentRegistry.provider(for: agent).displayName) para \(name) num terminal em \(workspace.name): faça o login no navegador com a conta da \(workspace.name). Depois volte aqui e clique em Verificar."
+        AgentSetup.whenInstalled(agent) { [model, workspace] in model.openTerminal?(workspace.root, command) }
     }
 
     private func connectGoogle(server: String) {
@@ -314,8 +361,8 @@ private struct GoogleForm: View {
                     Label("O MCP do Google precisa do uv (comando uvx), que não está instalado.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                     HStack {
-                        Text(ClaudeCodeSetup.uvInstallCommand).font(Theme.Font.mono).textSelection(.enabled)
-                        Button("Copiar") { ClaudeCodeSetup.copy(ClaudeCodeSetup.uvInstallCommand) }
+                        Text(AgentSetup.uvInstallCommand).font(Theme.Font.mono).textSelection(.enabled)
+                        Button("Copiar") { AgentSetup.copy(AgentSetup.uvInstallCommand) }
                     }
                     Text("Rode no Terminal e depois abra um terminal novo no Deckmux.").foregroundStyle(.secondary)
                 }
