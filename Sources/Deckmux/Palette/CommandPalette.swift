@@ -59,6 +59,8 @@ enum PaletteEntries {
                                     icon: "sun.max", shortcut: "⌘0", keywords: "home agenda inicio") { deck.show(.today) })
         entries.append(PaletteEntry(id: "page-workspaces", section: .pages, title: "Workspaces", subtitle: "Nome, cor, CLAUDE.md e MCPs",
                                     icon: "square.stack.3d.up", keywords: "configuracoes ajustes mcp") { deck.showWorkspacesTab() })
+        entries.append(PaletteEntry(id: "page-settings", section: .pages, title: "Ajustes", subtitle: "IAs que você usa",
+                                    icon: "gearshape", shortcut: "⌘,", keywords: "configuracoes preferencias settings ia codex kiro claude") { deck.showSettings() })
         entries.append(PaletteEntry(id: "page-task-manager", section: .pages, title: "Gerenciador de tarefas", subtitle: "Processos, CPU e memória",
                                     icon: "cpu", keywords: "task manager processos cpu memoria consumo encerrar") {
             TaskManagerWindowController.shared?.show()

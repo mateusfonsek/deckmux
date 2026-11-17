@@ -20,12 +20,18 @@ public struct AgentMark: Equatable, Sendable {
     public let glyph: String
     /// "#RRGGBB".
     public let colorHex: String
+    /// Bonsplit's scale for the tab bar button (its 13 pt text to the
+    /// height of its 12 pt symbols).
     public let scale: Double
+    /// Size in Deckmux's own views relative to Claude's ✳, for glyphs that
+    /// draw smaller in the font.
+    public let relativeSize: Double
 
-    public init(glyph: String, colorHex: String, scale: Double = 1) {
+    public init(glyph: String, colorHex: String, scale: Double = 1, relativeSize: Double = 1) {
         self.glyph = glyph
         self.colorHex = colorHex
         self.scale = scale
+        self.relativeSize = relativeSize
     }
 }
 

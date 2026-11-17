@@ -40,3 +40,11 @@ private let kiro = KiroProvider()
 @Test func registryHasAllThree() {
     #expect(AgentRegistry.all.map(\.kind) == [.claude, .codex, .kiro])
 }
+
+/// Capabilities must be protocol requirements: read through `any AgentProvider`
+/// (as the app does) an extension-only property would always be its default.
+@Test func capabilitiesThroughTheRegistry() {
+    #expect(AgentRegistry.provider(for: .codex).hookFile?.relativePath == ".codex/hooks.json")
+    #expect(AgentRegistry.provider(for: .kiro).hookFile?.relativePath == ".kiro/hooks/deckmux.json")
+    #expect(AgentRegistry.provider(for: .claude).hookFile == nil)
+}

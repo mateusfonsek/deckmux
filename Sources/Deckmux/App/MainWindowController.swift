@@ -19,6 +19,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
     /// Shown behind the items; visible only when there are none.
     private var emptyView: NSView?
     let workspacesModel: WorkspacesModel
+    /// The Ajustes screen; its own review model, so its file reviews do not
+    /// also show on the Workspaces screen.
+    let settingsModel: AgentsSettingsModel
     let nextMeeting: NextMeetingModel
     let tasks = TasksModel()
     /// Keeps the Mac awake until the chats finish.
@@ -35,6 +38,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
             MainActor.assumeIsolated { workspaces?.workspace(containing: path)?.manifest.color }
         }
         workspacesModel = WorkspacesModel(store: workspaces)
+        settingsModel = AgentsSettingsModel(review: WorkspacesModel(store: workspaces))
         nextMeeting = NextMeetingModel(store: workspaces)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 780),
@@ -71,6 +75,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, GhosttyT
         content.addSubview(empty)
         emptyView = empty
         pageViews[.workspaces] = PageHostingView(rootView: WorkspacesView(model: workspacesModel))
+        pageViews[.settings] = PageHostingView(rootView: SettingsView(model: settingsModel))
         pageViews[.today] = PageHostingView(rootView: TodayView(deck: deck, meetings: nextMeeting, tasks: tasks))
         for view in pageViews.values { view.autoresizingMask = [.width, .height] }
         window.contentView = root

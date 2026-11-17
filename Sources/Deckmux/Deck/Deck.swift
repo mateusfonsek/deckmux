@@ -126,7 +126,7 @@ final class Deck: ObservableObject {
 
     /// Full-area screens shown instead of the selected item; the terminals
     /// keep running behind them.
-    enum Page { case today, workspaces }
+    enum Page { case today, workspaces, settings }
 
     /// The page on screen, or nil when the selected item is shown.
     @Published private(set) var page: Page?
@@ -134,6 +134,7 @@ final class Deck: ObservableObject {
     var onShowPage: ((Page?) -> Void)?
 
     var showsWorkspaces: Bool { page == .workspaces }
+    var showsSettings: Bool { page == .settings }
 
     /// Shows `item`. Choosing an item leaves the page on screen, unless the
     /// selection only moves because another item closed.
@@ -155,6 +156,7 @@ final class Deck: ObservableObject {
     }
 
     func showWorkspacesTab() { show(.workspaces) }
+    func showSettings() { show(.settings) }
 
     /// Shows the terminal `id` with keyboard focus, which also clears its bell.
     func reveal(terminal id: UUID) {

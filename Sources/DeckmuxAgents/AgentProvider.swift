@@ -23,6 +23,12 @@ public protocol AgentProvider: Sendable {
     func hasTranscript(_ session: AgentSession, home: URL, environment: [String: String]) -> Bool?
     /// Translates one of this agent's hook messages; nil when Deckmux ignores it.
     func event(hook: String, payload: [String: String]) -> AgentEvent?
+
+    // Optional capabilities. They are requirements (with defaults in
+    // extensions) so that `any AgentProvider` dispatches to the agent's own.
+
+    /// The hooks file Deckmux installs when the agent is turned on.
+    var hookFile: AgentHookFile? { get }
 }
 
 public enum Shell {

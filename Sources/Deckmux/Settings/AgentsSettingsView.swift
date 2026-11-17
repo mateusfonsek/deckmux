@@ -17,10 +17,15 @@ final class AgentsSettingsModel: ObservableObject {
     @Published private(set) var rows: [Row] = []
     @Published private(set) var defaultAgent: AgentKind?
     @Published private(set) var resumes = true
+    /// What the user still has to do after turning an agent on.
+    @Published var notice: String?
     private let settings: AgentSettings
+    /// Shows the files turning an agent on or off writes, before writing them.
+    let review: WorkspacesModel
     private var observer: NSObjectProtocol?
 
-    init(settings: AgentSettings = .shared) {
+    init(review: WorkspacesModel, settings: AgentSettings = .shared) {
+        self.review = review
         self.settings = settings
         load()
         observer = NotificationCenter.default.addObserver(forName: AgentSettings.didChange, object: nil, queue: .main) { [weak self] _ in
@@ -50,7 +55,7 @@ final class AgentsSettingsModel: ObservableObject {
     }
 
     func setEnabled(_ kind: AgentKind, _ on: Bool) {
-        AgentActivation.request(kind, on: on, settings: settings)
+        AgentActivation.request(kind, on: on, settings: settings, review: review) { [weak self] in self?.notice = $0 }
     }
 
     func setDefault(_ kind: AgentKind) { settings.defaultAgent = kind }
@@ -58,6 +63,7 @@ final class AgentsSettingsModel: ObservableObject {
     func setResumes(_ on: Bool) { settings.resumesConversations = on }
 }
 
+/// The IAs section of the Ajustes screen.
 struct AgentsSettingsView: View {
     @ObservedObject var model: AgentsSettingsModel
 
@@ -65,6 +71,9 @@ struct AgentsSettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsCard(title: "IAs", subtitle: "As IAs que você usa. O Deckmux só configura e acompanha as que estão ligadas.") {
                 VStack(spacing: 10) {
+                    if let notice = model.notice {
+                        Callout(kind: .warning, text: notice, dismiss: { model.notice = nil })
+                    }
                     ForEach(model.rows) { row in
                         HStack(spacing: 10) {
                             AgentMark(agent: row.kind, working: false, size: 14)
@@ -99,8 +108,6 @@ struct AgentsSettingsView: View {
                 }
             }
         }
-        .padding(20)
-        .frame(width: 560)
     }
 
     @ViewBuilder private func installState(_ row: AgentsSettingsModel.Row) -> some View {

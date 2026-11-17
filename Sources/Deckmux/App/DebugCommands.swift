@@ -61,16 +61,29 @@ enum DebugCommands {
                 for note in notes { print("[debug] note \(note.request.identifier): \(note.request.content.body)") }
                 print("[debug] notes: \(notes.count)")
             }
-        case "settings": SettingsWindowController.shared.show()
+        case "settings": window.deck.showSettings()
         case "enable":
             let parts = rest.split(separator: " ").map(String.init)
             if parts.count == 2, let kind = AgentKind(rawValue: parts[0]) {
-                AgentActivation.request(kind, on: parts[1] == "on", settings: .shared)
+                let model = window.settingsModel
+                AgentActivation.request(kind, on: parts[1] == "on", settings: .shared, review: model.review) { model.notice = $0 }
             }
             print("[debug] enabled: \(AgentSettings.shared.enabled.map(\.rawValue))")
         case "button":
             if let layout = window.deck.selected?.layout {
                 layout.splitTabBar(layout.bonsplit, didRequestCustomAction: rest, inPane: layout.bonsplit.focusedPaneId ?? layout.bonsplit.allPaneIds[0])
+            }
+        case "review":
+            // Prints the pending review, or applies it with `review apply`.
+            if let pending = window.settingsModel.review.review {
+                let model = window.settingsModel.review
+                print("[debug] review: \(pending.set.title)")
+                for change in pending.set.changes {
+                    print("[debug]   \(change.url.path) \(change.summary)\n\(change.after ?? "<delete>")")
+                }
+                if rest == "apply" { model.apply(pending) }
+            } else {
+                print("[debug] review: none")
             }
         case "buttons":
             print("[debug] buttons: \(window.deck.selected?.layout.bonsplit.configuration.appearance.splitButtons.map(\.id) ?? [])")

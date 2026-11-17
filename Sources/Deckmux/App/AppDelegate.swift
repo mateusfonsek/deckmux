@@ -211,7 +211,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @MainActor @objc private func showSettings(_ sender: Any?) {
-        SettingsWindowController.shared.show()
+        NSApp.activate(ignoringOtherApps: true)
+        mainWindow?.window?.makeKeyAndOrderFront(nil)
+        mainWindow?.deck.showSettings()
     }
 
     @MainActor @objc private func showToday(_ sender: Any?) {

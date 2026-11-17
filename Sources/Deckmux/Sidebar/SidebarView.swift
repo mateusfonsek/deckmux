@@ -103,9 +103,13 @@ struct SidebarView: View {
             }
 
             Divider().opacity(0.5)
-            PageRow(title: "Workspaces", icon: "square.stack.3d.up", isSelected: deck.showsWorkspaces,
-                    badge: nil, shortcut: nil) { deck.showWorkspacesTab() }
-                .padding(10)
+            VStack(spacing: 2) {
+                PageRow(title: "Workspaces", icon: "square.stack.3d.up", isSelected: deck.showsWorkspaces,
+                        badge: nil, shortcut: nil) { deck.showWorkspacesTab() }
+                PageRow(title: "Ajustes", icon: "gearshape", isSelected: deck.showsSettings,
+                        badge: nil, shortcut: "⌘,") { deck.showSettings() }
+            }
+            .padding(10)
         }
         .frame(width: Theme.sidebarWidth)
         .frame(maxHeight: .infinity)
@@ -359,6 +363,11 @@ private struct SidebarRow: View {
         item.runningAgent.map { AgentRegistry.provider(for: $0).displayName } ?? "IA"
     }
 
+    /// The running agent's color (Claude's orange, Codex's green…).
+    private var agentColor: Color {
+        item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).mark.colorHex) }.map(Color.init) ?? Theme.claude
+    }
+
     /// The user's tag, then the state or the folder.
     private var subtitle: some View {
         HStack(spacing: 5) {
@@ -375,9 +384,9 @@ private struct SidebarRow: View {
             case .finished: Text("\(agentName) terminou").foregroundStyle(Theme.attention)
             }
         } else if case .subagents(let n)? = effect, !item.agentWorking {
-            Text(n == 1 ? "1 sub-agente" : "\(n) sub-agentes").foregroundStyle(Theme.claude)
+            Text(n == 1 ? "1 sub-agente" : "\(n) sub-agentes").foregroundStyle(agentColor)
         } else if item.agentWorking {
-            Text("\(agentName) trabalhando…").foregroundStyle(Theme.claude)
+            Text("\(agentName) trabalhando…").foregroundStyle(agentColor)
         } else {
             HStack(spacing: 4) {
                 if let branch = item.branch {
@@ -536,7 +545,7 @@ struct AgentMark: NSViewRepresentable {
     func updateNSView(_ view: AgentMarkView, context: Context) {
         let mark = AgentRegistry.provider(for: agent).mark
         view.update(glyph: mark.glyph, color: color.map(NSColor.init) ?? NSColor(hex: mark.colorHex) ?? .labelColor,
-                    size: size, working: working)
+                    size: size * mark.relativeSize, working: working)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: AgentMarkView, context: Context) -> CGSize? {
