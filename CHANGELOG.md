@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/mateusfonsek/deckmux/compare/v0.6.0...v0.6.1) (2026-11-18)
+
+
+### Correções
+
+* um símbolo só para IA e ícone de IA pelo processo do terminal ([#25](https://github.com/mateusfonsek/deckmux/issues/25)) ([2350c89](https://github.com/mateusfonsek/deckmux/commit/2350c893d72abefeb45f3c74ebd0988ff97ebf6d))
+
 ## [0.6.0](https://github.com/mateusfonsek/deckmux/compare/v0.5.1...v0.6.0) (2026-11-17)
 
 
