@@ -58,6 +58,11 @@ public enum CodingAgents {
         }
     }
 
+    /// The agent a running process is, from its name, path or arguments.
+    public static func agent(pid: Int) -> CodingAgent? {
+        ProcessTable.record(pid: pid).flatMap(agent(for:))
+    }
+
     public static func agent(for process: ProcessRecord) -> CodingAgent? {
         let names = basenames(name: process.name, path: process.path, arguments: process.arguments)
         if let agent = all.first(where: { agent in

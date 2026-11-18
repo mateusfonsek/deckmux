@@ -15,24 +15,10 @@ public enum AgentWorkSignal: Sendable {
     case hookTurns
 }
 
-/// The agent's symbol in the sidebar and tabs: an abstract glyph, never a brand logo.
-public struct AgentMark: Equatable, Sendable {
-    public let glyph: String
-    /// "#RRGGBB".
-    public let colorHex: String
-    /// Bonsplit's scale for the tab bar button (its 13 pt text to the
-    /// height of its 12 pt symbols).
-    public let scale: Double
-    /// Size in Deckmux's own views relative to Claude's ✳, for glyphs that
-    /// draw smaller in the font.
-    public let relativeSize: Double
-
-    public init(glyph: String, colorHex: String, scale: Double = 1, relativeSize: Double = 1) {
-        self.glyph = glyph
-        self.colorHex = colorHex
-        self.scale = scale
-        self.relativeSize = relativeSize
-    }
+/// The one symbol Deckmux shows for any AI (SF Symbol name). Agents differ
+/// by name and color, never by logo.
+public enum AIMarkSymbol {
+    public static let name = "sparkle"
 }
 
 /// How to install the agent when it is not on the PATH.

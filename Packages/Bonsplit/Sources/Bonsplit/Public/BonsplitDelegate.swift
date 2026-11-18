@@ -63,6 +63,10 @@ public protocol BonsplitDelegate: AnyObject {
     /// Called when the user clicks a host-defined action in the tab bar.
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID)
 
+    /// Deckmux: the items of a host-defined action's right-click menu; empty
+    /// for no menu. Choosing one requests the item's own custom action.
+    func splitTabBar(_ controller: BonsplitController, menuForCustomAction identifier: String, inPane pane: PaneID) -> [SplitActionMenuItem]
+
     /// Called when the user triggers an action from a tab's context menu.
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID)
 
@@ -108,10 +112,23 @@ public extension BonsplitDelegate {
     func splitTabBar(_ controller: BonsplitController, didFocusPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestNewTab kind: String, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {}
+    func splitTabBar(_ controller: BonsplitController, menuForCustomAction identifier: String, inPane pane: PaneID) -> [SplitActionMenuItem] { [] }
     func splitTabBar(_ controller: BonsplitController, didRequestTabContextAction action: TabContextAction, for tab: Tab, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didRequestTabMoveToDestination destinationId: String, for tab: Tab, inPane pane: PaneID) {}
     func splitTabBar(_ controller: BonsplitController, didChangeGeometry snapshot: LayoutSnapshot) {}
     func splitTabBar(_ controller: BonsplitController, shouldNotifyDuringDrag: Bool) -> Bool { false }
     func splitTabBarDividerDragDidBegin(_ controller: BonsplitController) {}
     func splitTabBarDividerDragDidEnd(_ controller: BonsplitController) {}
+}
+
+/// Deckmux: one entry of a split action button's right-click menu. `id` is
+/// the custom action requested when it is chosen.
+public struct SplitActionMenuItem: Hashable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
 }

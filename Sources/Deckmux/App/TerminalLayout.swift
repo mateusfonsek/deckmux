@@ -3,6 +3,7 @@ import Bonsplit
 import Combine
 import DeckmuxAgents
 import DeckmuxCode
+import DeckmuxTop
 import GhosttyKit
 import SwiftUI
 
@@ -42,6 +43,16 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     /// Terminals whose agent has a turn open (agents that report work through
     /// hooks: a prompt opens it, Stop closes it).
     @Published private(set) var agentTurns: Set<UUID> = []
+    /// Terminals whose foreground process is a coding agent (any CLI the
+    /// task manager knows), by terminal ID: their icon is the AI symbol even
+    /// before, or without, the agent's hooks.
+    @Published private(set) var detectedAgents: [UUID: String] = [:]
+    /// The agent each foreground PID was found to be, so a running agent is
+    /// read once.
+    private var detectionCache: [Int: String?] = [:]
+    private var detectionTimer: Timer?
+    /// Terminals the café holds (their tab shows its cup).
+    private var caffeineTerminals: Set<UUID> = []
     /// When each open turn last showed life (prompt or tool use).
     private var turnActivity: [UUID: Date] = [:]
     private var turnSweep: Timer?
@@ -59,6 +70,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     deinit {
         configObserver.map(NotificationCenter.default.removeObserver)
         turnSweep?.invalidate()
+        detectionTimer?.invalidate()
         commandObserver.map(NotificationCenter.default.removeObserver)
         settingsObserver.map(NotificationCenter.default.removeObserver)
     }
@@ -108,6 +120,7 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         settingsObserver = NotificationCenter.default.addObserver(forName: AgentSettings.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.agentSettingsDidChange() }
         }
+        startAgentDetection()
         commandObserver = NotificationCenter.default.addObserver(forName: .deckmuxCommandFinished, object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated {
                 guard let self, let surface = note.object as? Ghostty.SurfaceView, self.contains(surface) else { return }
@@ -407,7 +420,10 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     }
 
     func setAgentSession(_ session: AgentSession?, forTerminal id: UUID) {
-        if agentSessions[id] != session { agentSessions[id] = session }
+        if agentSessions[id] != session {
+            agentSessions[id] = session
+            updateTabIcon(id)
+        }
         if session == nil { setTurn(false, forTerminal: id) }
     }
 
@@ -464,8 +480,52 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
 
     /// The café's cup in place of the terminal icon while it keeps this terminal's chat awake.
     func setCaffeine(_ on: Bool, forTerminal id: UUID) {
+        if on { caffeineTerminals.insert(id) } else { caffeineTerminals.remove(id) }
+        updateTabIcon(id)
+    }
+
+    /// The café's cup, else the AI symbol while an agent runs, else the terminal.
+    private func updateTabIcon(_ id: UUID) {
         guard let surface = terminal(withID: id), let tab = tabId(of: surface) else { return }
-        bonsplit.updateTab(tab, icon: .some(on ? "cup.and.saucer.fill" : Self.tabIcon))
+        let icon = caffeineTerminals.contains(id) ? "cup.and.saucer.fill"
+            : runsAI(id) ? AIMarkSymbol.name : Self.tabIcon
+        bonsplit.updateTab(tab, icon: .some(icon))
+    }
+
+    /// An agent runs in the terminal: reported by its hooks or seen as its process.
+    func runsAI(_ id: UUID) -> Bool { agentSessions[id] != nil || detectedAgents[id] != nil }
+
+    // MARK: Agent detection
+
+    /// Every 2 s, which coding agent (if any) is each terminal's foreground
+    /// process. One sysctl per terminal; a PID already seen is not read again.
+    private func startAgentDetection() {
+        detectionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.detectAgents() }
+        }
+        detectionTimer?.tolerance = 1
+    }
+
+    private func detectAgents() {
+        var found: [UUID: String] = [:]
+        var seen: Set<Int> = []
+        for surface in surfaces.values {
+            guard let pid = surface.surfaceModel?.foregroundPID else { continue }
+            seen.insert(pid)
+            let agent: String?
+            if let cached = detectionCache[pid] {
+                agent = cached
+            } else {
+                agent = CodingAgents.agent(pid: pid)?.id
+                detectionCache[pid] = agent
+            }
+            if let agent { found[surface.id] = agent }
+        }
+        detectionCache = detectionCache.filter { seen.contains($0.key) }
+        guard found != detectedAgents else { return }
+        let changed = Set(found.keys).symmetricDifference(detectedAgents.keys)
+        detectedAgents = found
+        for id in changed { updateTabIcon(id) }
     }
 
     // MARK: Closing terminals
@@ -682,6 +742,8 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
         }
         if let surface = surfaces.removeValue(forKey: tab) {
             agentSessions.removeValue(forKey: surface.id)
+            detectedAgents.removeValue(forKey: surface.id)
+            caffeineTerminals.remove(surface.id)
             setTurn(false, forTerminal: surface.id)
             attention.removeValue(forKey: surface.id)
             attentionSince.removeValue(forKey: surface.id)
@@ -730,24 +792,17 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
     }
 
     static let tabIcon = "terminal.fill"
-    private static let agentButtonPrefix = "newAgent."
-
-    /// Opens a terminal that starts the agent right away. Its glyph is text
-    /// (✳ with U+FE0E, so it does not become the green emoji), painted by
-    /// Bonsplit in the same gray as the other buttons and scaled to their height.
-    static func agentButton(_ kind: AgentKind) -> BonsplitConfiguration.SplitActionButton {
-        let provider = AgentRegistry.provider(for: kind)
-        return .init(id: agentButtonPrefix + kind.rawValue, icon: .emoji(provider.mark.glyph, scale: provider.mark.scale),
-                     tooltip: "Novo terminal com \(provider.displayName)", action: .custom(agentButtonPrefix + kind.rawValue))
+    /// The AI button: a click opens the default agent (Ajustes), a
+    /// right-click lists the agents on (see `AgentLauncher`).
+    static func agentButton(settings: AgentSettings = .shared) -> BonsplitConfiguration.SplitActionButton? {
+        guard let tooltip = AgentLauncher.tooltip(settings: settings) else { return nil }
+        return .init(id: AgentLauncher.buttonID, icon: .systemImage(AIMarkSymbol.name), tooltip: tooltip,
+                     action: .custom(AgentLauncher.buttonID))
     }
 
-    /// One button per agent turned on in Ajustes, the default one first.
+    /// The AI button shows only while some agent is on.
     static func splitButtons(settings: AgentSettings = .shared) -> [BonsplitConfiguration.SplitActionButton] {
-        var agents = settings.enabled
-        if let first = settings.defaultAgent, let index = agents.firstIndex(of: first) {
-            agents.insert(agents.remove(at: index), at: 0)
-        }
-        return [.newTerminal] + agents.map(agentButton) + [codeButton, .splitRight, .splitDown]
+        [.newTerminal] + [agentButton(settings: settings)].compactMap { $0 } + [codeButton, .splitRight, .splitDown]
     }
 
     /// Ajustes changed: the agent buttons follow, and conversations of agents
@@ -792,6 +847,11 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
 
     // MARK: BonsplitDelegate
 
+    func splitTabBar(_ controller: BonsplitController, menuForCustomAction identifier: String, inPane pane: PaneID) -> [SplitActionMenuItem] {
+        guard identifier == AgentLauncher.buttonID else { return [] }
+        return AgentLauncher.menu(settings: .shared).map { SplitActionMenuItem(id: $0.id, title: $0.title) }
+    }
+
     func splitTabBar(_ controller: BonsplitController, shouldCloseTab tab: Bonsplit.Tab, inPane pane: PaneID) -> Bool {
         guard !skipCloseConfirmation, let surface = surfaces[tab.id], surface.needsConfirmQuit else { return true }
         return confirmClose()
@@ -827,9 +887,8 @@ final class TerminalLayout: ObservableObject, BonsplitDelegate {
 
     func splitTabBar(_ controller: BonsplitController, didRequestCustomAction identifier: String, inPane pane: PaneID) {
         switch identifier {
-        case let id where id.hasPrefix(Self.agentButtonPrefix):
-            guard let kind = AgentKind(rawValue: String(id.dropFirst(Self.agentButtonPrefix.count))) else { break }
-            openAgent(kind, inPane: pane)
+        case let id where AgentLauncher.agent(forAction: id, settings: .shared) != nil:
+            openAgent(AgentLauncher.agent(forAction: id, settings: .shared)!, inPane: pane)
         case Self.codeButton.id:
             openCodeForFocusedFolder(inPane: pane)
         default:

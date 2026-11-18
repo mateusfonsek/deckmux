@@ -50,7 +50,7 @@ enum PaletteEntries {
                 subtitle: [workspace?.name, item.branch, item.directory.map { ConfigPaths.display(URL(fileURLWithPath: $0)) }]
                     .compactMap { $0 }.joined(separator: " · "),
                 icon: item.runningAgent != nil ? "sparkle" : "terminal.fill",
-                color: item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).mark.colorHex).map(Color.init) } ?? workspace?.color,
+                color: item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).colorHex).map(Color.init) } ?? workspace?.color,
                 shortcut: shortcuts[item.id].map { "⌘\($0)" },
                 keywords: item.attention != nil ? "esperando atencao" : ""
             ) { deck.select(item) })
@@ -95,7 +95,7 @@ enum PaletteEntries {
             let provider = AgentRegistry.provider(for: kind)
             entries.append(PaletteEntry(id: "new-agent-\(kind.rawValue)", section: .actions, title: "Novo terminal com \(provider.displayName)",
                                         subtitle: TerminalLabel.folderName(deck.selected?.directory), icon: "sparkle",
-                                        color: NSColor(hex: provider.mark.colorHex).map(Color.init), keywords: "ia agente \(provider.executable)") {
+                                        color: NSColor(hex: provider.colorHex).map(Color.init), keywords: "ia agente \(provider.executable)") {
                 if let item = deck.selected {
                     item.layout.openAgent(kind, inPane: item.layout.bonsplit.focusedPaneId)
                 } else {

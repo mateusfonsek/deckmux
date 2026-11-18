@@ -11,7 +11,7 @@ public struct KiroProvider: AgentProvider {
     public let executable = "kiro-cli"
     public let install = AgentInstallInfo(command: "curl -fsSL https://cli.kiro.dev/install | bash",
                                           docsURL: URL(string: "https://kiro.dev/docs/cli/")!)
-    public let mark = AgentMark(glyph: "\u{25C6}\u{FE0E}", colorHex: "#9046FF", scale: 1.0)
+    public let colorHex = "#9046FF"
     public let workSignal = AgentWorkSignal.hookTurns
 
     public var mcp: (any AgentMcp)? { KiroMcp() }

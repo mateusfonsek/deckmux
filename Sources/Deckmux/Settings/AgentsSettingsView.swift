@@ -76,8 +76,6 @@ struct AgentsSettingsView: View {
                     }
                     ForEach(model.rows) { row in
                         HStack(spacing: 10) {
-                            AgentMark(agent: row.kind, working: false, size: 14)
-                                .frame(width: 18)
                             Text(row.name).font(.system(size: 13, weight: .medium))
                             Spacer()
                             installState(row)

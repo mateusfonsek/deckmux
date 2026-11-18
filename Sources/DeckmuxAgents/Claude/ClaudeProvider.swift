@@ -11,7 +11,7 @@ public struct ClaudeProvider: AgentProvider {
     public let executable = "claude"
     public let install = AgentInstallInfo(command: "curl -fsSL https://claude.ai/install.sh | bash",
                                           docsURL: URL(string: "https://docs.claude.com/en/docs/claude-code/setup")!)
-    public let mark = AgentMark(glyph: "\u{2733}\u{FE0E}", colorHex: "#D97757", scale: 1.2)
+    public let colorHex = "#D97757"
     public let workSignal = AgentWorkSignal.terminalTitle
 
     public var mcp: (any AgentMcp)? { ClaudeMcp() }

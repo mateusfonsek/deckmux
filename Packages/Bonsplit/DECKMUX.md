@@ -15,3 +15,7 @@ Deckmux changes:
   `windowBackgroundColor` in whatever appearance was current. Before, a tab bar
   kept the colors of the appearance it was created in (black in light mode
   after a split, light after switching to dark), terminal-only layouts too.
+- Right-click menu on host-defined split buttons
+  (`BonsplitDelegate.splitTabBar(_:menuForCustomAction:inPane:)`,
+  `SplitActionMenuItem`): the AI button opens the default agent on click and
+  lists the agents on right-click.

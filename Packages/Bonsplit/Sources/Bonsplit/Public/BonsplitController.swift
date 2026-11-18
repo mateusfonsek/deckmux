@@ -305,6 +305,11 @@ public final class BonsplitController {
         delegate?.splitTabBar(self, didRequestCustomAction: identifier, inPane: pane)
     }
 
+    /// Deckmux: the right-click menu of a host-defined action, from the delegate.
+    public func customActionMenu(_ identifier: String, inPane pane: PaneID) -> [SplitActionMenuItem] {
+        delegate?.splitTabBar(self, menuForCustomAction: identifier, inPane: pane) ?? []
+    }
+
     /// Request the delegate to handle a tab context-menu action.
     public func requestTabContextAction(_ action: TabContextAction, for tabId: TabID, inPane pane: PaneID) {
         if action == .toggleFullWidthTab {

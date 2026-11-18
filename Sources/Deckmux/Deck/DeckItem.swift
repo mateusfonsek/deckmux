@@ -28,6 +28,10 @@ final class DeckItem: ObservableObject, Identifiable {
     /// The agent the sidebar shows: the focused terminal's, else one that
     /// runs in another terminal here; nil when none runs.
     @Published private(set) var runningAgent: AgentKind?
+    /// Some terminal here runs an AI (its hooks reported it, or its process
+    /// is a coding agent): the sidebar shows the AI symbol.
+    @Published private(set) var runsAI = false
+    private var detectionObservation: AnyCancellable?
     /// The focused terminal's agent.
     private var focusedAgent: AgentKind? {
         didSet { updateRunningAgent() }
@@ -134,6 +138,11 @@ final class DeckItem: ObservableObject, Identifiable {
             .map { sessions in AgentKind.allCases.first { kind in sessions.values.contains { $0.agent == kind } } }
             .removeDuplicates()
             .sink { [weak self] value in self?.anyAgent = value }
+        detectionObservation = layout.$agentSessions.map { !$0.isEmpty }
+            .combineLatest(layout.$detectedAgents.map { !$0.isEmpty })
+            .map { $0 || $1 }
+            .removeDuplicates()
+            .sink { [weak self] value in self?.runsAI = value }
         attentionObservation = layout.$attention
             .sink { [weak self] bells in
                 guard let self else { return }
