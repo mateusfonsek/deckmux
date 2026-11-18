@@ -175,3 +175,21 @@ private func row(_ id: String, _ level: Int, cpu: Double, memory: Int64 = 0) -> 
     #expect(try #require(table[bare.parentPID]).memoryBytes == 0)
     #expect(table.count == structure.count)
 }
+
+/// A terminal's foreground process tells which agent runs there, even before
+/// (or without) its hooks: a `kiro-cli` running is Kiro.
+@Test func agentOfARunningProcess() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let fake = dir.appendingPathComponent("kiro-cli")
+    try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: fake)
+    let process = Process()
+    process.executableURL = fake
+    process.arguments = ["5"]
+    try process.run()
+    defer { process.terminate() }
+    usleep(200_000)
+    #expect(CodingAgents.agent(pid: Int(process.processIdentifier))?.id == "kiro")
+    #expect(CodingAgents.agent(pid: Int(getpid()))?.id == nil)
+    #expect(CodingAgents.agent(pid: 999_999) == nil)
+}

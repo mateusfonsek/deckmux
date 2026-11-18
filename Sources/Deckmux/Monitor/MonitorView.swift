@@ -121,9 +121,10 @@ private struct SessionBlock: View {
                             .font(.system(size: 12.5, weight: .medium))
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        // Which agent runs there, in its own color.
-                        AgentMark(agent: session.agent, working: false, size: 11)
-                            .help(AgentRegistry.provider(for: session.agent).displayName)
+                        // Which agent runs there: its name, in its color.
+                        Text(AgentRegistry.provider(for: session.agent).displayName)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(NSColor(hex: AgentRegistry.provider(for: session.agent).colorHex).map(Color.init) ?? .secondary)
                     }
                     TimelineView(.periodic(from: .now, by: 30)) { context in
                         Text(MonitorModel.stateText(session, now: context.date))

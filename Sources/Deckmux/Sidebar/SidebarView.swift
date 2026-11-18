@@ -349,8 +349,8 @@ private struct SidebarRow: View {
             Image(systemName: TerminalLayout.codeTabIcon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(color)
-        } else if let agent = item.runningAgent {
-            AgentMark(agent: agent, working: item.agentWorking, color: color)
+        } else if item.runsAI {
+            AIMark(working: item.agentWorking, color: color)
         } else {
             Image(systemName: "terminal.fill")
                 .font(.system(size: 14))
@@ -365,7 +365,7 @@ private struct SidebarRow: View {
 
     /// The running agent's color (Claude's orange, Codex's green…).
     private var agentColor: Color {
-        item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).mark.colorHex) }.map(Color.init) ?? Theme.claude
+        item.runningAgent.flatMap { NSColor(hex: AgentRegistry.provider(for: $0).colorHex) }.map(Color.init) ?? Theme.claude
     }
 
     /// The user's tag, then the state or the folder.
@@ -529,32 +529,30 @@ final class CaffeineOutlineView: NSView {
     }
 }
 
-/// The agent's glyph (✳ for Claude) in the item's workspace color, as tall as
-/// the terminal and code icons beside it; it turns while the agent works. The turn is a Core Animation
+/// The AI symbol (one for every agent) in the item's workspace color, as tall
+/// as the terminal and code icons beside it; it turns while the agent works. The turn is a Core Animation
 /// animation on the glyph's layer, run by the render server: SwiftUI's
 /// repeatForever re-rendered the whole sidebar every frame while the agent
 /// worked, and kept doing it after it stopped.
-struct AgentMark: NSViewRepresentable {
-    let agent: AgentKind
+struct AIMark: NSViewRepresentable {
     let working: Bool
-    var color: Color? = nil
+    var color: Color = Theme.claude
     var size: CGFloat = 18
 
-    func makeNSView(context: Context) -> AgentMarkView { AgentMarkView() }
+    func makeNSView(context: Context) -> AIMarkView { AIMarkView() }
 
-    func updateNSView(_ view: AgentMarkView, context: Context) {
-        let mark = AgentRegistry.provider(for: agent).mark
-        view.update(glyph: mark.glyph, color: color.map(NSColor.init) ?? NSColor(hex: mark.colorHex) ?? .labelColor,
-                    size: size * mark.relativeSize, working: working)
+    func updateNSView(_ view: AIMarkView, context: Context) {
+        view.update(color: NSColor(color), size: size, working: working)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: AgentMarkView, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: AIMarkView, context: Context) -> CGSize? {
         nsView.glyphSize
     }
 }
 
-final class AgentMarkView: NSView {
-    private let glyph = CATextLayer()
+final class AIMarkView: NSView {
+    private let glyph = CALayer()
+    private var drawn: (color: NSColor, size: CGFloat)?
     private(set) var glyphSize = CGSize.zero
     private var working = false
     private static let spinKey = "spin"
@@ -562,22 +560,24 @@ final class AgentMarkView: NSView {
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        glyph.alignmentMode = .center
         layer?.addSublayer(glyph)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    func update(glyph symbol: String, color: NSColor, size: CGFloat, working: Bool) {
-        let font = NSFont.systemFont(ofSize: size, weight: .bold)
-        let text = NSAttributedString(string: symbol, attributes: [.font: font, .foregroundColor: color])
-        if text != glyph.string as? NSAttributedString {
-            glyph.string = text
-            let measured = text.size()
-            glyphSize = CGSize(width: ceil(measured.width), height: ceil(measured.height))
-            invalidateIntrinsicContentSize()
-            needsLayout = true
+    func update(color: NSColor, size: CGFloat, working: Bool) {
+        if drawn?.color != color || drawn?.size != size {
+            drawn = (color, size)
+            let config = NSImage.SymbolConfiguration(pointSize: size * 0.8, weight: .semibold)
+                .applying(.init(paletteColors: [color]))
+            if let image = NSImage(systemSymbolName: AIMarkSymbol.name, accessibilityDescription: "IA")?.withSymbolConfiguration(config) {
+                glyph.contents = image
+                glyph.contentsGravity = .resizeAspect
+                glyphSize = CGSize(width: ceil(image.size.width), height: ceil(image.size.height))
+                invalidateIntrinsicContentSize()
+                needsLayout = true
+            }
         }
         self.working = working
         updateSpin()

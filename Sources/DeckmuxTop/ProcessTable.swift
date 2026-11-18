@@ -58,6 +58,19 @@ public enum ProcessTable {
         return table
     }
 
+    /// One process, with its details; nil when it is gone.
+    public static func record(pid: Int) -> ProcessRecord? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, Int32(pid)]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0, info.kp_proc.p_pid == Int32(pid) else { return nil }
+        let device = info.kp_eproc.e_tdev
+        let record = ProcessRecord(pid: pid, parentPID: Int(info.kp_eproc.e_ppid), groupID: Int(info.kp_eproc.e_pgid),
+                                   ttyDevice: device == -1 ? nil : Int64(UInt32(bitPattern: device)),
+                                   name: fixedString(info.kp_proc.p_comm))
+        return detailed(record)
+    }
+
     /// The table with name, path, CPU time, memory (and arguments) read for `pids`.
     public static func withDetails(_ table: [Int: ProcessRecord], for pids: some Sequence<Int>) -> [Int: ProcessRecord] {
         var table = table

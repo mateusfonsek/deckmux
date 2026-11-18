@@ -1697,6 +1697,20 @@ struct TabBarView: View {
             }
             .buttonStyle(SplitActionButtonStyle(appearance: appearance, layout: tabBarLayout))
             .accessibilityLabel(splitActionButtonTooltip(button, tooltips: tooltips))
+            .contextMenu { splitActionButtonMenu(button) }
+        }
+    }
+
+    /// Deckmux: the host's right-click menu for a custom action (nothing for the others).
+    @ViewBuilder
+    private func splitActionButtonMenu(_ button: BonsplitConfiguration.SplitActionButton) -> some View {
+        if case .custom(let identifier) = button.action {
+            ForEach(controller.customActionMenu(identifier, inPane: pane.id)) { item in
+                Button(item.title) {
+                    guard splitViewController.isInteractive else { return }
+                    controller.requestCustomAction(item.id, inPane: pane.id)
+                }
+            }
         }
     }
 

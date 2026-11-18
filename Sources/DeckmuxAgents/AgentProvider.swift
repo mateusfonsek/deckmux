@@ -11,7 +11,8 @@ public protocol AgentProvider: Sendable {
     /// The executable on the user's PATH.
     var executable: String { get }
     var install: AgentInstallInfo { get }
-    var mark: AgentMark { get }
+    /// "#RRGGBB": the color of texts about it ("Codex trabalhando…").
+    var colorHex: String { get }
     var workSignal: AgentWorkSignal { get }
 
     /// Typed into a new terminal to start the agent.

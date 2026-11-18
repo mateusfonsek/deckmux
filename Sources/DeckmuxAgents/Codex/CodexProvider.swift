@@ -11,8 +11,7 @@ public struct CodexProvider: AgentProvider {
     public let executable = "codex"
     public let install = AgentInstallInfo(command: "npm install -g @openai/codex",
                                           docsURL: URL(string: "https://developers.openai.com/codex/cli")!)
-    /// A hexagon: abstract, and apart from Gemini's four-pointed star.
-    public let mark = AgentMark(glyph: "\u{2B21}\u{FE0E}", colorHex: "#10A37F", scale: 1.5, relativeSize: 1.35)
+    public let colorHex = "#10A37F"
     public let workSignal = AgentWorkSignal.hookTurns
 
     public var mcp: (any AgentMcp)? { CodexMcp() }

@@ -123,10 +123,11 @@ enum DebugCommands {
             print("[debug] usage agent: \(AgentSettings.shared.usageAgent?.rawValue ?? "-")")
         case "buttons":
             print("[debug] buttons: \(window.deck.selected?.layout.bonsplit.configuration.appearance.splitButtons.map(\.id) ?? [])")
+            print("[debug] ai menu: \(AgentLauncher.menu(settings: .shared).map(\.title)) click opens: \(AgentLauncher.agent(forAction: AgentLauncher.buttonID, settings: .shared)?.rawValue ?? "-")")
         case "state":
             for item in window.deck.items {
                 let layout = item.layout
-                print("[debug] item \(item.displayName) agent=\(item.runningAgent?.rawValue ?? "-") working=\(item.agentWorking)")
+                print("[debug] item \(item.displayName) agent=\(item.runningAgent?.rawValue ?? "-") ai=\(item.runsAI) detected=\(layout.detectedAgents.values.sorted()) working=\(item.agentWorking)")
                 for (id, session) in layout.agentSessions {
                     print("[debug]   \(session.agent.rawValue) \(session.sessionID) turn=\(layout.agentTurns.contains(id)) working=\(AgentWork.isWorking(terminal: id, in: layout)) bell=\(String(describing: layout.attention[id]))")
                 }
